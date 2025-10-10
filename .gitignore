@@ -1,23 +1,50 @@
-node_modules
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Output
-.output
-.vercel
-.netlify
-.wrangler
-/.svelte-kit
-/build
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
 
-# OS
-.DS_Store
-Thumbs.db
+# Dependency directories
+node_modules/
 
-# Env
+# SvelteKit specific
+.svelte-kit/
+build/
+
+# Vite build output
+dist/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional eslint cache
+.eslintcache
+
+# dotenv environment variables file
 .env
 .env.*
 !.env.example
-!.env.test
 
-# Vite
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
+# IDE directories and files
+.idea/
+.vscode/*
+!/.vscode/extensions.json
+!/.vscode/settings.json
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
