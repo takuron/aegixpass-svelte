@@ -1,0 +1,12 @@
+{
+  "name": "AegixPass - Pin",
+  "version": 1,
+  "hashAlgorithm": "sha256",
+  "rngAlgorithm": "chaCha20",
+  "shuffleAlgorithm": "fisherYates",
+  "length": 6,
+  "platformId": "aegixpass.takuron.com",
+  "charsets": [
+    "0123456789"
+  ]
+}

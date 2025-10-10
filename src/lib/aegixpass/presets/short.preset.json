@@ -1,0 +1,15 @@
+{
+  "name": "AegixPass - Short",
+  "version": 1,
+  "hashAlgorithm": "sha256",
+  "rngAlgorithm": "chaCha20",
+  "shuffleAlgorithm": "fisherYates",
+  "length": 10,
+  "platformId": "aegixpass.takuron.com",
+  "charsets": [
+    "0123456789",
+    "abcdefghijklmnopqrstuvwxyz",
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "!@#$%^&*_+-="
+  ]
+}
