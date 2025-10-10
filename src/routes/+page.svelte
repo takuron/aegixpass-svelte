@@ -90,7 +90,7 @@
 
         <div class="card w-full max-w-lg bg-base-100 shadow-xl transition-all">
             <form class="card-body">
-                <h2 class="card-title text-2xl font-bold">AegixPass Svelte</h2>
+                <h2 class="card-title text-2xl font-bold">AegixPass</h2>
                 <p class="text-base-content/70 mb-6">一个安全、确定性的密码生成器</p>
 
 
@@ -157,13 +157,6 @@
                                 {copySuccess ? '✅ 已复制' : '📋 复制'}
                             </button>
                         </div>
-                    </div>
-                {/if}
-
-                {#if errorMsg}
-                    <div role="alert" class="alert alert-error shadow-lg mt-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <span>{errorMsg}</span>
                     </div>
                 {/if}
             </form>
