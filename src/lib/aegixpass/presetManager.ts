@@ -80,19 +80,35 @@ export function loadBuiltInPresets(): Preset[] {
 }
 
 /**
- * 解析并验证一个 JSON 字符串，通常来自用户上传的文件。
+ * 解析并验证一个 JSON 字符串，优先检查版本号。
  * @param jsonContent - 包含预设配置的 JSON 格式字符串。
  * @returns {Preset} - 一个经过验证的 Preset 对象。
  * @throws {AegixPassError} - 如果 JSON 格式错误或验证失败。
  */
 export function parseAndValidatePreset(jsonContent: string): Preset {
-  try {
-    const parsedJson = JSON.parse(jsonContent);
-    return validateAndTransformObjectToPreset(parsedJson);
-  } catch (error) {
-    if (error instanceof AegixPassError) {
-      throw error; // 重新抛出我们的自定义验证错误
+    let parsedJson: any;
+    try {
+        parsedJson = JSON.parse(jsonContent);
+    } catch (error) {
+        throw new AegixPassError('Failed to parse JSON string. Please check the file format.');
     }
-    throw new AegixPassError('Failed to parse JSON string. Please check the file format.');
-  }
+
+    // 在结构化前，提前进行版本检查
+    if (parsedJson.version === undefined) {
+        throw new AegixPassError('Invalid preset: "version" field is missing.');
+    }
+    if (parsedJson.version !== 1) {
+        throw new AegixPassError(`Unsupported preset version: "${parsedJson.version}". This app only supports version 1 presets.`);
+    }
+
+    // 版本正确，再进行完整的结构验证
+    try {
+        return validateAndTransformObjectToPreset(parsedJson);
+    } catch (error) {
+        if (error instanceof AegixPassError) {
+            throw error; // 重新抛出我们的自定义验证错误
+        }
+        // 创建一个更通用的备用错误
+        throw new AegixPassError('The JSON is valid, but the preset object structure is incorrect.');
+    }
 }

@@ -5,21 +5,58 @@
         loadBuiltInPresets,
         AegixPassError,
         type Preset,
+        parseAndValidatePreset,
     } from '$lib/aegixpass';
+
+    // 定义与自定义预设页面一致的键和默认值
+    const CUSTOM_PRESET_STORAGE_KEY = 'aegixpass-custom-preset';
+    const defaultCustomPreset: Preset = {
+        name: 'Custom - Default',
+        version: 1,
+        hashAlgorithm: 'sha256',
+        rngAlgorithm: 'chaCha20',
+        shuffleAlgorithm: 'fisherYates',
+        length: 16,
+        platformId: 'aegixpass.takuron.com',
+        charsets: [
+            '0123456789',
+            'abcdefghijklmnopqrstuvwxyz',
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+            '!@#$%^&*()_+-=[]{}|;:,.<>?'
+        ]
+    };
 
     let masterPassword = '';
     let siteKey = '';
     let availablePresets: Preset[] = [];
     let selectedPreset: Preset | undefined;
     let generatedPassword = '';
-    let errorMsg = '';
     let isLoading = false;
     let copySuccess = false;
 
     onMount(() => {
-        availablePresets = loadBuiltInPresets();
+        // 1. 加载内置预设
+        const builtInPresets = loadBuiltInPresets();
+
+        // 2. 尝试从 localStorage 加载自定义预设
+        let customPreset: Preset;
+        const savedPresetString = localStorage.getItem(CUSTOM_PRESET_STORAGE_KEY);
+        if (savedPresetString) {
+            try {
+                customPreset = parseAndValidatePreset(savedPresetString);
+            } catch (e) {
+                console.error("Failed to load custom preset from localStorage, using default.", e);
+                customPreset = defaultCustomPreset;
+            }
+        } else {
+            customPreset = defaultCustomPreset;
+        }
+
+        // 3. 组合预设列表
+        availablePresets = [...builtInPresets,customPreset];
+
         if (availablePresets.length > 0) {
-            selectedPreset = availablePresets[0];
+            selectedPreset = availablePresets[0]; // 默认选中自定义预设
         }
     });
 
@@ -30,7 +67,6 @@
 
         generatedPassword = '';
         isLoading = true;
-
         try {
             generatedPassword = await aegixPassGenerator(
                 masterPassword,
@@ -65,12 +101,14 @@
             <span>主密码</span>
             <input
                     bind:value={masterPassword}
+
                     type='password'
                     placeholder="主密码"
                     class="input input-bordered w-full validator"
                     required
             />
             <div class="validator-hint">主密码是必填项</div>
+
         </div>
 
         <div class="form-control w-full floating-label">
@@ -78,6 +116,7 @@
             <input
                     bind:value={siteKey}
                     type="text"
+
                     placeholder="区分密钥 (例如 a.com)"
                     class="input input-bordered w-full validator"
                     required
@@ -86,12 +125,14 @@
         </div>
 
         <div class="form-control w-full">
+
             <div class="label mb-1">
                 <span class="label-text">选择预设配置</span>
             </div>
             <select bind:value={selectedPreset} class="select select-bordered w-full">
                 {#each availablePresets as preset (preset.name)}
                     <option value={preset}>{preset.name}</option>
+
                 {/each}
             </select>
         </div>
@@ -100,12 +141,14 @@
             <button
                     class="btn btn-primary w-full"
                     type="submit"
+
                     disabled={isLoading}
             >
                 {#if isLoading}
                     <span class="loading loading-spinner"></span>
                     正在生成...
                 {:else}
+
                     生成密码
                 {/if}
             </button>
@@ -114,14 +157,17 @@
         {#if generatedPassword}
             <div class="mt-6 space-y-2">
                 <div class="label"><span class="label-text">生成的密码:</span></div>
+
                 <div class="mockup-code relative">
                     <pre class="px-4 py-2"><code>{generatedPassword}</code></pre>
                     <button
                             class="btn btn-ghost btn-sm absolute top-2 right-2"
+
                             on:click={handleCopy}
                             type="button"
                     >
-                        {copySuccess ? '✅ 已复制' : '📋 复制'}
+                        {copySuccess ?
+                            '✅ 已复制' : '📋 复制'}
                     </button>
                 </div>
             </div>
