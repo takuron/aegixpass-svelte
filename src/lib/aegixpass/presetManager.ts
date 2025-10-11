@@ -1,10 +1,6 @@
 import { AegixPassError, HashAlgorithm, RngAlgorithm, ShuffleAlgorithm, type Preset } from './types';
 // Vite/Vue 支持直接导入 JSON 文件，它会自动解析为 JavaScript 对象
 import defaultPresetJson from './presets/default.preset.json';
-import noSymbolPresetJson from './presets/no-symbol.preset.json';
-import pinPresetJson from './presets/pin.preset.json';
-import shortPresetJson from './presets/short.preset.json';
-import sha3PresetJson from './presets/sha3.preset.json';
 
 /**
  * 将一个普通的 JavaScript 对象（来自 JSON 解析）安全地转换为强类型的 Preset。
@@ -46,17 +42,41 @@ function validateAndTransformObjectToPreset(obj: any): Preset {
  * 加载所有内置的预设文件。
  * @returns {Preset[]} 一个包含所有内置预设的数组。
  */
-export function loadBuiltInPresets(): Preset[] {
-  // --- 修改部分：将所有导入的 JSON 对象都放入这个数组中 ---
-  const builtInJsons = [
-    defaultPresetJson,
-    noSymbolPresetJson,
-    pinPresetJson,
-    shortPresetJson,
-    sha3PresetJson,
-  ];
+// export function loadBuiltInPresets(): Preset[] {
+//   // --- 修改部分：将所有导入的 JSON 对象都放入这个数组中 ---
+//   const builtInJsons = [
+//     defaultPresetJson,
+//   ];
+//
+//   return builtInJsons.map(validateAndTransformObjectToPreset);
+// }
 
-  return builtInJsons.map(validateAndTransformObjectToPreset);
+export function loadBuiltInPresets(): Preset[] {
+    // 1. 使用 import.meta.glob 静态导入所有位于 /static/preset/v1/ 目录下的 .json 文件
+    // { eager: true } 确保这是同步导入，而不是返回一个 Promise
+    // { as: 'raw' } 确保我们将文件内容作为原始字符串导入
+    const presetModules = import.meta.glob('/static/preset/v1/*.json', { eager: true, as: 'raw' });
+
+    const presets: Preset[] = [];
+    for (const path in presetModules) {
+        // 2. 忽略 index.json，我们只关心预设文件本身
+        if (path.endsWith('index.json')) {
+            continue;
+        }
+
+        try {
+            const jsonContent = presetModules[path];
+            const parsedJson = JSON.parse(jsonContent);
+            presets.push(validateAndTransformObjectToPreset(parsedJson));
+        } catch (error) {
+            console.error(`Failed to parse or validate preset at ${path}:`, error);
+        }
+    }
+
+    // 3. （可选）按名称排序，确保每次加载顺序一致
+    presets.sort((a, b) => a.name.localeCompare(b.name));
+
+    return presets;
 }
 
 /**

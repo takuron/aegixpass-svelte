@@ -1,0 +1,26 @@
+[
+  {
+    "name": "AegixPass - Default",
+    "file": "/preset/v1/default.json"
+  },
+  {
+    "name": "AegixPass - NoSymbol",
+    "file": "/preset/v1/no-symbol.json"
+  },
+  {
+    "name": "AegixPass - Pin",
+    "file": "/preset/v1/pin.json"
+  },
+  {
+    "name": "AegixPass - Sha3",
+    "file": "/preset/v1/sha3.json"
+  },
+  {
+    "name": "AegixPass - Short",
+    "file": "/preset/v1/short.json"
+  },
+  {
+    "name": "AegixPass - Short|NoSymbol",
+    "file": "/preset/v1/short-no-symbol.json"
+  }
+]
