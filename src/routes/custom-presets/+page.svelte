@@ -1,26 +1,7 @@
 <script lang="ts">
     import {onMount} from 'svelte';
     import {parseAndValidatePreset, type Preset} from '$lib/aegixpass';
-
-    // 定义存储在 localStorage 中的键
-    const CUSTOM_PRESET_STORAGE_KEY = 'aegixpass-custom-preset';
-
-    // 编辑器的默认预设，仅在用户从未保存过自定义预设时使用
-    const defaultCustomPreset: Preset = {
-        name: 'Custom - Default',
-        version: 1,
-        hashAlgorithm: 'sha256',
-        rngAlgorithm: 'chaCha20',
-        shuffleAlgorithm: 'fisherYates',
-        length: 16,
-        platformId: 'aegixpass.takuron.com',
-        charsets: [
-            '0123456789',
-            'abcdefghijklmnopqrstuvwxyz',
-            'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-            '!@#$%^&*_+-='
-        ]
-    };
+    import {CUSTOM_PRESET_STORAGE_KEY, DEFAULT_CUSTOM_PRESET} from "$lib/constants";
 
     let presetJsonString = '';
     let errorMsg = '';
@@ -33,7 +14,7 @@
         if (savedPreset) {
             presetJsonString = savedPreset;
         } else {
-            presetJsonString = JSON.stringify(defaultCustomPreset, null, 2);
+            presetJsonString = JSON.stringify(DEFAULT_CUSTOM_PRESET, null, 2);
         }
     });
 
@@ -41,7 +22,7 @@
     function handleReset() {
         showSuccessAlert = false;
         errorMsg = '';
-        presetJsonString = JSON.stringify(defaultCustomPreset, null, 2);
+        presetJsonString = JSON.stringify(DEFAULT_CUSTOM_PRESET, null, 2);
     }
 
     // 保存时，将验证后的 JSON 字符串存入 localStorage

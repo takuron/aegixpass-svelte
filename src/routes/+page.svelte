@@ -7,32 +7,18 @@
         type Preset,
         parseAndValidatePreset,
     } from '$lib/aegixpass';
-
-    // 定义与自定义预设页面一致的键和默认值
-    const CUSTOM_PRESET_STORAGE_KEY = 'aegixpass-custom-preset';
-    const defaultCustomPreset: Preset = {
-        name: 'Custom - Default',
-        version: 1,
-        hashAlgorithm: 'sha256',
-        rngAlgorithm: 'chaCha20',
-        shuffleAlgorithm: 'fisherYates',
-        length: 16,
-        platformId: 'aegixpass.takuron.com',
-        charsets: [
-            '0123456789',
-            'abcdefghijklmnopqrstuvwxyz',
-            'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-            '!@#$%^&*()_+-=[]{}|;:,.<>?'
-        ]
-    };
+    import {CUSTOM_PRESET_STORAGE_KEY, DEFAULT_CUSTOM_PRESET} from "$lib/constants";
 
     let masterPassword = '';
     let siteKey = '';
     let availablePresets: Preset[] = [];
-    let selectedPreset: Preset | undefined;
+    let selectedPreset: Preset;
     let generatedPassword = '';
     let isLoading = false;
     let copySuccess = false;
+
+    let errorMsg = '';
+    let errorModal: HTMLDialogElement;
 
     onMount(() => {
         // 1. 加载内置预设
@@ -46,17 +32,17 @@
                 customPreset = parseAndValidatePreset(savedPresetString);
             } catch (e) {
                 console.error("Failed to load custom preset from localStorage, using default.", e);
-                customPreset = defaultCustomPreset;
+                customPreset = DEFAULT_CUSTOM_PRESET;
             }
         } else {
-            customPreset = defaultCustomPreset;
+            customPreset = DEFAULT_CUSTOM_PRESET;
         }
 
         // 3. 组合预设列表
         availablePresets = [...builtInPresets,customPreset];
 
         if (availablePresets.length > 0) {
-            selectedPreset = availablePresets[0]; // 默认选中自定义预设
+            selectedPreset = availablePresets[0];
         }
     });
 
@@ -75,8 +61,14 @@
             );
         } catch (e) {
             console.error(e);
+            console.error(e);
+            // --- 修改：捕获错误并显示模态框 ---
             if (e instanceof AegixPassError) {
-                // Handle error
+                errorMsg = e.message;
+                errorModal.showModal();
+            } else if (e instanceof Error) {
+                errorMsg = '发生了一个未知错误：' + e.message;
+                errorModal.showModal();
             }
         } finally {
             isLoading = false;
@@ -174,3 +166,13 @@
         {/if}
     </form>
 </div>
+
+<dialog id="error_modal" class="modal" bind:this={errorModal}>
+    <div class="modal-box">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 class="font-bold text-lg text-error">生成失败!</h3>
+        <p class="py-4">{errorMsg}</p>
+    </div>
+</dialog>

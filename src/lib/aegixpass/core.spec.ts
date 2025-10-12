@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 
 // 2. 导入我们要测试的目标函数，以及新的预设加载函数
-import { aegixPassGenerator, loadBuiltInPresets, type Preset} from '$lib/aegixpass'
+import {AegixPassError, aegixPassGenerator, loadBuiltInPresets, type Preset} from '$lib/aegixpass'
 
 // 3. 使用 'describe' 来创建一个测试套件
 describe('aegixPassGenerator with built-in presets', () => {
@@ -61,4 +61,114 @@ describe('aegixPassGenerator with built-in presets', () => {
     // --- Assert ---
     expect(generatedPassword).toBe(expectedPassword);
   });
+});
+
+describe('aegixPassGenerator with edge case inputs', () => {
+    // 使用一个基础的、行为可预测的预设
+    const basicPreset: Preset = {
+        name: 'Test-Basic',
+        version: 1,
+        hashAlgorithm: 'sha256',
+        rngAlgorithm: 'chaCha20',
+        shuffleAlgorithm: 'fisherYates',
+        length: 4,
+        platformId: 'aegixpass.takuron.com',
+        charsets: ['a', 'b', 'c', 'd']
+    };
+
+    // --- 测试用例定义 ---
+    const edgeCaseInputs = [
+        // Case 1: 输入仅包含空格
+        {
+            caseName: 'should handle inputs with only whitespace',
+            masterPassword: '   ',
+            distinguishKey: ' ',
+            expectedToThrow: false // 算法应该能正常处理，因为空格也是字符
+        },
+        // Case 2: 输入包含各种 Unicode 字符和 Emoji
+        {
+            caseName: 'should handle inputs with Unicode and Emojis',
+            masterPassword: '密码🔑123',
+            distinguishKey: '测试网站.com 😊',
+            expectedToThrow: false // 算法的核心是处理字节，所以应该能兼容任何 UTF-8 字符
+        },
+        // Case 3: 输入非常长
+        {
+            caseName: 'should handle very long inputs',
+            masterPassword: 'a'.repeat(1000),
+            distinguishKey: 'b'.repeat(1000),
+            expectedToThrow: false
+        },
+        // Case 4: 密码长度刚好等于字符集数量
+        {
+            caseName: 'should work when password length equals the number of charsets',
+            preset: { ...basicPreset, length: 4 }, // length (4) === charsets.length (4)
+            expectedToThrow: false
+        },
+        // Case 5: 字符集中包含重复字符 (算法应该能正常处理)
+        {
+            caseName: 'should handle duplicate characters within charsets',
+            preset: { ...basicPreset, length: 10, charsets: ['aabc', 'ddee', 'ffgg'] },
+            expectedToThrow: false
+        },
+        // Case 6: 字符集中包含 Unicode 字符
+        {
+            caseName: 'should handle Unicode characters in charsets',
+            preset: { ...basicPreset, length: 10, charsets: ['你好', '🚀', 'AB'] },
+            expectedToThrow: false
+        }
+    ];
+
+    // --- 运行测试 ---
+    edgeCaseInputs.forEach(({ caseName, masterPassword = 'default', distinguishKey = 'default', preset = basicPreset, expectedToThrow }) => {
+        it(caseName, async () => {
+            if (expectedToThrow) {
+                // 对于预期会抛出错误的用例
+                await expect(
+                    aegixPassGenerator(masterPassword, distinguishKey, preset)
+                ).rejects.toThrow(AegixPassError);
+            } else {
+                // 对于预期会成功的用例
+                const password = await aegixPassGenerator(masterPassword, distinguishKey, preset);
+                expect(password).toBeDefined();
+                expect(typeof password).toBe('string');
+                if (preset.length) {
+                    expect(password.length).toBe(preset.length);
+                }
+            }
+        });
+    });
+});
+
+// 同样可以放在 src/lib/aegixpass/core.spec.ts 中
+
+describe('aegixPassGenerator input validation', () => {
+
+    const validPreset: Preset = { /* ...一个有效的预设... */ };
+
+    it('should throw if master password is empty', async () => {
+        await expect(
+            aegixPassGenerator('', 'example.com', validPreset)
+        ).rejects.toThrow('Master password and distinguish key cannot be empty.');
+    });
+
+    it('should throw if distinguish key is empty', async () => {
+        await expect(
+            aegixPassGenerator('password', '', validPreset)
+        ).rejects.toThrow('Master password and distinguish key cannot be empty.');
+    });
+
+    it('should throw if password length is less than number of charsets', async () => {
+        const presetWithShortLength = { ...validPreset, length: 2, charsets: ['a', 'b', 'c'] };
+        await expect(
+            aegixPassGenerator('password', 'example.com', presetWithShortLength)
+        ).rejects.toThrow(/Password length \(2\) is too short for 3 charset groups/);
+    });
+
+    it('should throw if a charset group is empty', async () => {
+        const presetWithEmptyCharset = { ...validPreset, charsets: ['a', 'b', ''] };
+        await expect(
+            aegixPassGenerator('password', 'example.com', presetWithEmptyCharset)
+        ).rejects.toThrow('All charset groups must contain at least one character.');
+    });
 });
