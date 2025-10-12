@@ -1,6 +1,6 @@
 <script lang="ts">
     import {onMount} from 'svelte';
-    import {page} from '$app/stores'; // 导入 page store
+    import {page} from '$app/stores';
     import '../app.css';
     import logo from '$lib/assets/logo.png';
 

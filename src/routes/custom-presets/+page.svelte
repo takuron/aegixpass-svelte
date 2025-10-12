@@ -63,7 +63,7 @@
                     bind:value={presetJsonString}
                     class="textarea textarea-bordered h-96 font-mono w-full"
                     placeholder="输入 JSON 格式的预设"
-            />
+            ></textarea>
         </div>
 
         {#if showSuccessAlert}
@@ -80,8 +80,7 @@
                             stroke-width="2"
                             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
-                </svg
-                >
+                </svg>
                 <span>预设已成功保存！</span>
             </div>
         {/if}

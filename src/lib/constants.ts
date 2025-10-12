@@ -1,5 +1,5 @@
 // 定义存储在 localStorage 中的键
-import type {Preset} from "$lib/aegixpass";
+import {HashAlgorithm, type Preset, RngAlgorithm, ShuffleAlgorithm} from "$lib/aegixpass";
 
 export const CUSTOM_PRESET_STORAGE_KEY = 'aegixpass-custom-preset';
 
@@ -7,9 +7,9 @@ export const CUSTOM_PRESET_STORAGE_KEY = 'aegixpass-custom-preset';
 export const DEFAULT_CUSTOM_PRESET: Preset = {
     name: 'Custom - Default',
     version: 1,
-    hashAlgorithm: 'sha256',
-    rngAlgorithm: 'chaCha20',
-    shuffleAlgorithm: 'fisherYates',
+    hashAlgorithm: HashAlgorithm.Sha256,
+    rngAlgorithm: RngAlgorithm.ChaCha20,
+    shuffleAlgorithm: ShuffleAlgorithm.FisherYates,
     length: 16,
     platformId: 'aegixpass.takuron.com',
     charsets: [

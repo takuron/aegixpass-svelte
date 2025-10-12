@@ -55,7 +55,11 @@ export function loadBuiltInPresets(): Preset[] {
     // 1. 使用 import.meta.glob 静态导入所有位于 /static/preset/v1/ 目录下的 .json 文件
     // { eager: true } 确保这是同步导入，而不是返回一个 Promise
     // { as: 'raw' } 确保我们将文件内容作为原始字符串导入
-    const presetModules = import.meta.glob('/static/preset/v1/*.json', { eager: true, as: 'raw' });
+    const presetModules = import.meta.glob('/static/preset/v1/*.json', {
+        eager: true,
+        query: '?raw',
+        import: 'default'
+    });
 
     const presets: Preset[] = [];
     for (const path in presetModules) {
@@ -66,7 +70,7 @@ export function loadBuiltInPresets(): Preset[] {
 
         try {
             const jsonContent = presetModules[path];
-            const parsedJson = JSON.parse(jsonContent);
+            const parsedJson = JSON.parse(jsonContent as string);
             presets.push(validateAndTransformObjectToPreset(parsedJson));
         } catch (error) {
             console.error(`Failed to parse or validate preset at ${path}:`, error);

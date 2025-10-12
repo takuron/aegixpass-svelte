@@ -1,84 +1,115 @@
 <script lang="ts">
+    // --- 1. 导入依赖 ---
     import { onMount } from 'svelte';
     import {
         aegixPassGenerator,
         loadBuiltInPresets,
         AegixPassError,
         type Preset,
-        parseAndValidatePreset,
+        parseAndValidatePreset
     } from '$lib/aegixpass';
-    import {CUSTOM_PRESET_STORAGE_KEY, DEFAULT_CUSTOM_PRESET} from "$lib/constants";
+    // 从共享的常量文件中导入 localStorage 键和默认的自定义预设对象
+    import { CUSTOM_PRESET_STORAGE_KEY, DEFAULT_CUSTOM_PRESET } from '$lib/constants';
 
+    // --- 2. 组件状态变量 (Component State) ---
+    // 绑定主密码输入框的值
     let masterPassword = '';
+    // 绑定区分密钥输入框的值
     let siteKey = '';
+    // 存储所有可用的预设选项（内置 + 自定义）
     let availablePresets: Preset[] = [];
+    // 绑定预设下拉选择框的当前选中值
     let selectedPreset: Preset;
+    // 存储最终生成的密码
     let generatedPassword = '';
+    // 控制生成按钮是否处于加载状态
     let isLoading = false;
+    // 控制“已复制”提示的显示状态
     let copySuccess = false;
 
+    // 用于错误提示模态框的状态变量
     let errorMsg = '';
-    let errorModal: HTMLDialogElement;
+    let errorModal: HTMLDialogElement; // 用于绑定 <dialog> DOM 元素
 
+    // --- 3. 组件生命周期函数 (Lifecycle Function) ---
+    // onMount 会在组件首次渲染到 DOM 后执行一次
     onMount(() => {
-        // 1. 加载内置预设
+        // 步骤 1: 加载所有内置的 JSON 预设文件
         const builtInPresets = loadBuiltInPresets();
 
-        // 2. 尝试从 localStorage 加载自定义预设
+        // 步骤 2: 尝试从浏览器的 localStorage 中加载用户保存的自定义预设
         let customPreset: Preset;
         const savedPresetString = localStorage.getItem(CUSTOM_PRESET_STORAGE_KEY);
         if (savedPresetString) {
             try {
+                // 如果找到了，就解析并验证它
                 customPreset = parseAndValidatePreset(savedPresetString);
             } catch (e) {
-                console.error("Failed to load custom preset from localStorage, using default.", e);
+                // 如果解析或验证失败，打印错误并使用默认的自定义预设作为备用
+                console.error('Failed to load custom preset from localStorage, using default.', e);
                 customPreset = DEFAULT_CUSTOM_PRESET;
             }
         } else {
+            // 如果没找到，直接使用默认的自定义预设
             customPreset = DEFAULT_CUSTOM_PRESET;
         }
 
-        // 3. 组合预设列表
-        availablePresets = [...builtInPresets,customPreset];
+        // 步骤 3: 将内置预设和自定义预设组合成一个完整的列表
+        availablePresets = [...builtInPresets, customPreset];
 
+        // 步骤 4: 如果列表不为空，默认选中第一个预设
         if (availablePresets.length > 0) {
             selectedPreset = availablePresets[0];
         }
     });
 
+    // --- 4. 事件处理函数 (Event Handlers) ---
+    /**
+     * 处理“生成密码”按钮的点击事件或表单提交事件。
+     */
     async function handleGenerate() {
+        // 基本验证：确保主密码和区分密钥不为空
         if (!masterPassword || !siteKey) {
             return;
         }
 
+        // 重置状态
         generatedPassword = '';
         isLoading = true;
         try {
+            // 调用核心的密码生成函数
             generatedPassword = await aegixPassGenerator(
                 masterPassword,
                 siteKey,
-                selectedPreset as Preset
+                selectedPreset as Preset // 断言 selectedPreset 已被 onMount 初始化
             );
         } catch (e) {
+            // 如果生成过程中发生错误
             console.error(e);
-            console.error(e);
-            // --- 修改：捕获错误并显示模态框 ---
+            // 检查错误类型并设置相应的提示信息
             if (e instanceof AegixPassError) {
                 errorMsg = e.message;
-                errorModal.showModal();
+                errorModal.showModal(); // 显示错误模态框
             } else if (e instanceof Error) {
                 errorMsg = '发生了一个未知错误：' + e.message;
-                errorModal.showModal();
+                errorModal.showModal(); // 显示错误模态框
             }
         } finally {
+            // 无论成功或失败，都结束加载状态
             isLoading = false;
         }
     }
 
+    /**
+     * 处理“复制”按钮的点击事件。
+     */
     function handleCopy() {
         if (!generatedPassword) return;
+
+        // 使用浏览器的 Clipboard API 将密码复制到剪贴板
         navigator.clipboard.writeText(generatedPassword).then(() => {
-            copySuccess = true;
+            copySuccess = true; // 显示“已复制”提示
+            // 2秒后自动隐藏提示
             setTimeout(() => (copySuccess = false), 2000);
         });
     }
@@ -93,14 +124,12 @@
             <span>主密码</span>
             <input
                     bind:value={masterPassword}
-
-                    type='password'
+                    type="password"
                     placeholder="主密码"
                     class="input input-bordered w-full validator"
                     required
             />
             <div class="validator-hint">主密码是必填项</div>
-
         </div>
 
         <div class="form-control w-full floating-label">
@@ -108,7 +137,6 @@
             <input
                     bind:value={siteKey}
                     type="text"
-
                     placeholder="区分密钥 (例如 a.com)"
                     class="input input-bordered w-full validator"
                     required
@@ -117,30 +145,22 @@
         </div>
 
         <div class="form-control w-full">
-
             <div class="label mb-1">
                 <span class="label-text">选择预设配置</span>
             </div>
             <select bind:value={selectedPreset} class="select select-bordered w-full">
                 {#each availablePresets as preset (preset.name)}
                     <option value={preset}>{preset.name}</option>
-
                 {/each}
             </select>
         </div>
 
         <div class="card-actions justify-end mt-6">
-            <button
-                    class="btn btn-primary w-full"
-                    type="submit"
-
-                    disabled={isLoading}
-            >
+            <button class="btn btn-primary w-full" type="submit" disabled={isLoading}>
                 {#if isLoading}
                     <span class="loading loading-spinner"></span>
                     正在生成...
                 {:else}
-
                     生成密码
                 {/if}
             </button>
@@ -149,17 +169,14 @@
         {#if generatedPassword}
             <div class="mt-6 space-y-2">
                 <div class="label"><span class="label-text">生成的密码:</span></div>
-
                 <div class="mockup-code relative">
                     <pre class="px-4 py-2"><code>{generatedPassword}</code></pre>
                     <button
                             class="btn btn-ghost btn-sm absolute top-2 right-2"
-
                             on:click={handleCopy}
                             type="button"
                     >
-                        {copySuccess ?
-                            '✅ 已复制' : '📋 复制'}
+                        {copySuccess ? '✅ 已复制' : '📋 复制'}
                     </button>
                 </div>
             </div>

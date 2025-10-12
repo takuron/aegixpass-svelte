@@ -1,10 +1,18 @@
 // src/lib/aegixpass/core.spec.ts
 
 // 1. 从 vitest 导入测试所需的函数
-import { describe, it, expect } from 'vitest';
+import {describe, expect, it} from 'vitest';
 
 // 2. 导入我们要测试的目标函数，以及新的预设加载函数
-import {AegixPassError, aegixPassGenerator, loadBuiltInPresets, type Preset} from '$lib/aegixpass'
+import {
+    AegixPassError,
+    aegixPassGenerator,
+    HashAlgorithm,
+    loadBuiltInPresets,
+    type Preset,
+    RngAlgorithm,
+    ShuffleAlgorithm
+} from '$lib/aegixpass'
 
 // 3. 使用 'describe' 来创建一个测试套件
 describe('aegixPassGenerator with built-in presets', () => {
@@ -68,9 +76,9 @@ describe('aegixPassGenerator with edge case inputs', () => {
     const basicPreset: Preset = {
         name: 'Test-Basic',
         version: 1,
-        hashAlgorithm: 'sha256',
-        rngAlgorithm: 'chaCha20',
-        shuffleAlgorithm: 'fisherYates',
+        hashAlgorithm: HashAlgorithm.Sha256,
+        rngAlgorithm: RngAlgorithm.ChaCha20,
+        shuffleAlgorithm: ShuffleAlgorithm.FisherYates,
         length: 4,
         platformId: 'aegixpass.takuron.com',
         charsets: ['a', 'b', 'c', 'd']
@@ -145,9 +153,9 @@ describe('aegixPassGenerator input validation', () => {
     const validPreset: Preset = {
         name: 'Test-Basic',
         version: 1,
-        hashAlgorithm: 'sha256',
-        rngAlgorithm: 'chaCha20',
-        shuffleAlgorithm: 'fisherYates',
+        hashAlgorithm: HashAlgorithm.Sha256,
+        rngAlgorithm: RngAlgorithm.ChaCha20,
+        shuffleAlgorithm: ShuffleAlgorithm.FisherYates,
         length: 4,
         platformId: 'aegixpass.takuron.com',
         charsets: ['a', 'b', 'c', 'd']
