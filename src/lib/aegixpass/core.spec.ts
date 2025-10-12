@@ -140,11 +140,19 @@ describe('aegixPassGenerator with edge case inputs', () => {
     });
 });
 
-// 同样可以放在 src/lib/aegixpass/core.spec.ts 中
-
 describe('aegixPassGenerator input validation', () => {
 
-    const validPreset: Preset = { /* ...一个有效的预设... */ };
+    const validPreset: Preset = {
+        name: 'Test-Basic',
+        version: 1,
+        hashAlgorithm: 'sha256',
+        rngAlgorithm: 'chaCha20',
+        shuffleAlgorithm: 'fisherYates',
+        length: 4,
+        platformId: 'aegixpass.takuron.com',
+        charsets: ['a', 'b', 'c', 'd']
+    };
+
 
     it('should throw if master password is empty', async () => {
         await expect(
