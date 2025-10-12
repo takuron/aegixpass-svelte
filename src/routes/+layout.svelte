@@ -1,6 +1,6 @@
 <script lang="ts">
     import {onMount} from 'svelte';
-    import {page} from '$app/stores';
+    import { page } from '$app/state';
     import '../app.css';
     import logo from '$lib/assets/logo.png';
 
@@ -52,9 +52,9 @@
                     <a href="/" class="text-xl font-bold">AegixPass</a>
                 </div>
                 <ul>
-                    <li><a href="/" class:menu-active={$page.url.pathname === '/'}>首页</a></li>
-                    <li><a href="/custom-presets" class:menu-active={$page.url.pathname === '/custom-presets'}>自定义预设</a></li>
-                    <li><a href="/algorithm" class:menu-active={$page.url.pathname === '/algorithm'}>算法介绍</a></li>
+                    <li><a href="/" class:menu-active={page.url.pathname === '/'}>首页</a></li>
+                    <li><a href="/custom-presets" class:menu-active={page.url.pathname === '/custom-presets'}>自定义预设</a></li>
+                    <li><a href="/algorithm" class:menu-active={page.url.pathname === '/algorithm'}>算法介绍</a></li>
                 </ul>
             </div>
 

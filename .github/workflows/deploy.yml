@@ -1,83 +1,104 @@
 # 工作流名称
-name: Deploy to GitHub Pages
+name: CI & Deploy
 
-# 触发条件：当有代码推送到 main 分支时触发
+# 触发条件：改为推送到所有分支时都触发
 on:
   push:
     branches:
-      - main
+      - '**' # '**' 匹配所有分支
 
-# 权限设置：为工作流授予部署到 GitHub Pages 所需的权限
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# 作业：定义一个名为 'build-and-deploy' 的作业
+# 作业：定义两个作业，'test' 和 'deploy'
 jobs:
-  build-and-deploy:
-    # 作业环境：指定该作业在 GitHub Pages 的环境中运行
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }} # 部署完成后，将 URL 输出到 Action 日志
-    
+  # 作业1：测试 (在所有分支上运行)
+  test:
     # 运行环境：使用最新的 Ubuntu 虚拟机
     runs-on: ubuntu-latest
 
-    # 步骤：定义作业的具体执行步骤
+    # 步骤：定义测试作业的具体执行步骤
     steps:
       # 步骤 1: 检出代码
-      # 使用官方的 checkout action 来获取你的仓库代码
       - name: Checkout
         uses: actions/checkout@v4
 
       # 步骤 2: 设置 pnpm
-      # 你的项目使用 pnpm (根据 pnpm-lock.yaml 文件)，所以我们需要安装它
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 9 # 你可以根据需要指定 pnpm 版本
+          version: 9
 
       # 步骤 3: 设置 Node.js 环境
-      # 通过读取项目根目录下的 .nvmrc 文件来自动设置 Node.js 版本
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # 不再硬编码版本号，而是指定读取 .nvmrc 文件
-          # 这确保了 CI 环境与你的本地开发环境版本一致
           node-version-file: '.nvmrc'
-          cache: 'pnpm' # 启用 pnpm 的依赖缓存，加快后续构建速度
+          cache: 'pnpm'
 
       # 步骤 4: 安装依赖
-      # 运行 pnpm install 来安装 package.json 中定义的所有依赖
       - name: Install dependencies
         run: pnpm install
 
       # 步骤 5: 运行测试
-      # 运行 `pnpm test` 命令。如果测试失败，整个工作流将中止，防止部署有问题的代码。
+      # 如果测试失败，此作业将失败，并且 'deploy' 作业不会运行
       - name: Run tests
         run: pnpm test
 
-      # 步骤 6: 编译项目
-      # 运行 `pnpm build` 命令。SvelteKit (配合 adapter-static) 会将你的应用编译成静态文件
-      # 并输出到 `svelte.config.js` 中定义的 `build` 目录。
+  # 作业2：构建和部署 (仅在 main 分支上运行)
+  deploy:
+    # 使用 if 条件判断，只有当 git ref (引用) 是 main 分支时才执行此作业
+    if: github.ref_name == 'main'
+
+    # 添加 needs: test，确保测试作业成功后才开始部署
+    needs: test
+
+    # 作业环境：指定该作业在 GitHub Pages 的环境中运行
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    # 运行环境
+    runs-on: ubuntu-latest
+
+    # 权限设置
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    # 步骤
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      # 注意：这里的 pnpm test 是可选的，因为 test 作业已经跑过了
+      # 但保留它可以作为双重保险
+      - name: Run tests
+        run: pnpm test
+
       - name: Build project
         run: pnpm build
 
-      # 步骤 7: 配置 GitHub Pages
-      # 配置 Action 以便能将构建产物上传到 Pages
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      # 步骤 8: 上传构建产物
-      # 将 `build` 目录下的所有文件打包成一个 artifact，供后续的部署步骤使用
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./build
 
-      # 步骤 9: 部署到 GitHub Pages
-      # 使用官方的 deploy-pages action 来获取之前上传的 artifact 并将其部署到 GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

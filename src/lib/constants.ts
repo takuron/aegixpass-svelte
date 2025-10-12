@@ -19,3 +19,5 @@ export const DEFAULT_CUSTOM_PRESET: Preset = {
         '!@#$%^&*_+-='
     ]
 };
+
+export const SITE_URL = 'https://aegixpass.takuron.com';

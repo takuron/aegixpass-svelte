@@ -115,10 +115,15 @@
     }
 </script>
 
+<svelte:head>
+    <title>AegixPass - 安全、免费、开源的确定性密码派生工具</title>
+    <meta name="description" content="AegixPass 是一款零信任、纯客户端的确定性密码生成器。无需存储密码，只需一个主密码即可为所有网站生成安全、可复现的密码。" />
+</svelte:head>
+
 <div class="card w-full max-w-lg bg-base-100 shadow-xl transition-all">
     <form class="card-body" on:submit|preventDefault={handleGenerate}>
-        <h2 class="card-title text-2xl font-bold">AegixPass</h2>
-        <p class="text-base-content/70 mb-6">一个安全、确定性的密码生成器</p>
+        <h1 class="card-title text-2xl font-bold">AegixPass</h1>
+        <p class="text-base-content/70 mb-6">一个安全、免费、开源的确定性密码派生工具</p>
 
         <div class="form-control w-full floating-label">
             <span>主密码</span>
