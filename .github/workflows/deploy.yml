@@ -39,11 +39,13 @@ jobs:
           version: 9 # 你可以根据需要指定 pnpm 版本
 
       # 步骤 3: 设置 Node.js 环境
-      # 指定一个 Node.js 版本来运行后续的命令
+      # 通过读取项目根目录下的 .nvmrc 文件来自动设置 Node.js 版本
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22' # 推荐使用 LTS 版本
+          # 不再硬编码版本号，而是指定读取 .nvmrc 文件
+          # 这确保了 CI 环境与你的本地开发环境版本一致
+          node-version-file: '.nvmrc'
           cache: 'pnpm' # 启用 pnpm 的依赖缓存，加快后续构建速度
 
       # 步骤 4: 安装依赖
