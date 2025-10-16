@@ -12,8 +12,8 @@
     "file": "/preset/v1/pin.json"
   },
   {
-    "name": "AegixPass - Sha3",
-    "file": "/preset/v1/sha3.json"
+    "name": "AegixPass - Sha256",
+    "file": "/preset/v1/sha256.json"
   },
   {
     "name": "AegixPass - Short",
@@ -22,5 +22,13 @@
   {
     "name": "AegixPass - Short|NoSymbol",
     "file": "/preset/v1/short-no-symbol.json"
+  },
+  {
+    "name": "AegixPass - Long",
+    "file": "/preset/v1/long.json"
+  },
+  {
+    "name": "AegixPass - Long|NoSymbol",
+    "file": "/preset/v1/long-no-symbol.json"
   }
 ]

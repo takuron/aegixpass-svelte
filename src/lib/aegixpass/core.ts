@@ -3,15 +3,17 @@
 // --- 1. 导入依赖 ---
 // 从 @noble/hashes 库导入各种哈希算法的实现。
 // 这些库是经过审计的、高性能的加密原语，适合在客户端环境中使用。
-import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
-import { sha3_256 } from '@noble/hashes/sha3.js';
-import { blake3 } from '@noble/hashes/blake3.js';
+import {sha256 as nobleSha256} from '@noble/hashes/sha2.js';
+import {sha3_256} from '@noble/hashes/sha3.js';
+import {blake3} from '@noble/hashes/blake3.js';
 // 从 @noble/ciphers 库导入 ChaCha20 流密码的实现。
 // ChaCha20 在这里被用作一个确定性的随机数生成器 (PRNG)。
-import { chacha20 } from '@noble/ciphers/chacha.js';
+import {chacha20} from '@noble/ciphers/chacha.js';
 // 从项目的类型定义文件中导入错误类和枚举类型。
 // 这有助于保持代码的类型安全和一致性。
-import { AegixPassError, HashAlgorithm, RngAlgorithm, type Preset } from './types';
+import {AegixPassError, HashAlgorithm, RngAlgorithm, type Preset} from './types';
+import {argon2id} from "@noble/hashes/argon2.js";
+import {scrypt} from "@noble/hashes/scrypt.js";
 
 
 // --- 3. 关键辅助函数：无偏的范围随机数生成器 ---
@@ -62,11 +64,41 @@ async function generateMasterSeed(password_source: string, distinguish_key: stri
 
     // 根据预设中指定的哈希算法，对编码后的输入进行哈希计算，并返回结果。
     switch (preset.hashAlgorithm) {
-        case HashAlgorithm.Sha256: return nobleSha256(encodedInput);
-        case HashAlgorithm.Blake3: return blake3(encodedInput);
-        case HashAlgorithm.Sha3_256: return sha3_256(encodedInput);
+        case HashAlgorithm.Sha256:
+            return nobleSha256(encodedInput);
+        case HashAlgorithm.Blake3:
+            return blake3(encodedInput);
+        case HashAlgorithm.Sha3_256:
+            return sha3_256(encodedInput);
+        case HashAlgorithm.Argon2id: {
+            // 1. 生成确定性的盐：salt = sha256(platformId)
+            const salt = nobleSha256(new TextEncoder().encode(preset.platformId));
+            // 2. 设置与 Rust 版本完全一致的参数
+            const opts = {
+                m: 19456, // 内存成本 (19 MiB)
+                t: 2,     // 时间成本 (2 次迭代)
+                p: 1,     // 并行度 (1 个线程)
+                dkLen: 32 // 输出密钥长度 (32 字节)
+            };
+            // 3. 执行 Argon2id 密钥派生
+            return argon2id(encodedInput, salt, opts);
+        }
+        case HashAlgorithm.Scrypt: {
+            // 1. 生成确定性的盐：salt = sha256(platformId)
+            const salt = nobleSha256(new TextEncoder().encode(preset.platformId));
+            // 2. 设置与 Rust 版本完全一致的参数
+            const opts = {
+                N: 2 ** 15, // N=32768
+                r: 8,
+                p: 1,
+                dkLen: 32 // 输出密钥长度 (32 字节)
+            };
+            // 3. 执行 Scrypt 密钥派生
+            return scrypt(encodedInput, salt, opts);
+        }
         // 如果预设中的算法不被支持，则抛出错误。
-        default: throw new Error(`Unsupported hash algorithm: ${preset.hashAlgorithm}`);
+        default:
+            throw new Error(`Unsupported hash algorithm: ${preset.hashAlgorithm}`);
     }
 }
 
@@ -86,10 +118,18 @@ export async function aegixPassGenerator(
 ): Promise<string> {
     // --- (阶段 A) 输入验证 ---
     // 在开始计算前，进行严格的输入检查，以避免产生不安全或无效的结果。
-    if (!password_source || !distinguish_key) { throw new AegixPassError('Master password and distinguish key cannot be empty.'); }
-    if (preset.length < preset.charsets.length) { throw new AegixPassError(`Password length (${preset.length}) is too short for ${preset.charsets.length} charset groups.`); }
-    if (preset.charsets.some(cs => cs.length === 0)) { throw new AegixPassError('All charset groups must contain at least one character.'); }
-    if (preset.rngAlgorithm !== RngAlgorithm.ChaCha20) { throw new AegixPassError(`This implementation only supports the 'chaCha20' RNG algorithm.`); }
+    if (!password_source || !distinguish_key) {
+        throw new AegixPassError('Master password and distinguish key cannot be empty.');
+    }
+    if (preset.length < preset.charsets.length) {
+        throw new AegixPassError(`Password length (${preset.length}) is too short for ${preset.charsets.length} charset groups.`);
+    }
+    if (preset.charsets.some(cs => cs.length === 0)) {
+        throw new AegixPassError('All charset groups must contain at least one character.');
+    }
+    if (preset.rngAlgorithm !== RngAlgorithm.ChaCha20) {
+        throw new AegixPassError(`This implementation only supports the 'chaCha20' RNG algorithm.`);
+    }
 
     // --- (阶段 B) 生成主种子 ---
     // 这是整个确定性算法的基石。

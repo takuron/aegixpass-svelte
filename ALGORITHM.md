@@ -26,7 +26,7 @@ AegixPass 是一种确定性密码生成算法，其输出只依赖于输入的�
 {
   "name": "AegixPass - Default",
   "version": 1,
-  "hashAlgorithm": "sha256",
+  "hashAlgorithm": "argon2id",
   "rngAlgorithm": "chaCha20",
   "shuffleAlgorithm": "fisherYates",
   "length": 16,
@@ -43,7 +43,7 @@ AegixPass 是一种确定性密码生成算法，其输出只依赖于输入的�
 - `length`: 密码总长度。
 - `version`: 算法的版本。
 - `charsets`: 一个字符串数组，定义了密码应包含的字符分组。例如，数字、小写字母、大写字母和符号。
-- `hashAlgorithm`: 用于生成主种子的哈希算法，如 `sha256`, `blake3`, `sha3_256`。
+- `hashAlgorithm`: 用于生成主种子的哈希算法，如 `sha256`, `blake3`, `sha3_256`, `argon2id`, `scrypt`。
 - `rngAlgorithm`: 确定性随机数生成器算法，目前实现为 `chaCha20`。
 - `shuffleAlgorithm`: 洗牌算法，固定为 `fisherYates`。
 - `platformId`: 平台ID，作为一个额外可以变动的盐值用于算法使用者做区分。
@@ -71,9 +71,9 @@ AegixPass 是一种确定性密码生成算法，其输出只依赖于输入的�
       AegixPass_V1:aegixpass.takuron.com:16:MySecretPassword123!:example.com:["0123456789","abc...","ABC...","!@#..."]
       ```
     - 这种设计确保了预设中的任何一个参数（甚至是 `charsets` 的顺序）发生变化，都会生成一个完全不同的种子。
-
-2. **哈希计算**：对上一步拼接好的 UTF-8 编码的字符串，使用预设中指定的哈希算法（如 `sha256`）进行计算。
-
+2. **哈希计算**：根据 hashAlgorithm 的类型，使用不同的方法处理上一步的输入数据：
+    - **如果使用快哈希** (sha256, blake3, sha3_256): 直接对上一步拼接好的 UTF-8 编码字符串进行哈希计算，得到 32 字节的主种子。
+    - **如果使用慢哈希** (argon2id, scrypt): 慢哈希是内存困难型函数，需要额外的盐（Salt）和计算参数来增加破解难度。 a. 生成确定性盐：为了保证整个流程的确定性，盐值由 platformId 通过 SHA-256 哈希生成：salt = sha256(platformId)。 b. 执行密钥派生： * 对于 argon2id：使用 Argon2id 算法，结合预设的参数（内存成本: 19 MiB, 迭代次数: 2, 并行度: 1），处理输入数据和盐，派生出 32 字节的主种子。 * 对于 scrypt：使用 Scrypt 算法，结合预设的参数（N=2^15, r=8, p=1），处理输入数据和盐，派生出 32 字节的主种子。
 3. **获取种子**：将哈希结果作为 32 字节的主种子。
 
 ### 阶段 C: 保证每个字符集至少出现一次 (字符集保证)
@@ -92,7 +92,7 @@ AegixPass 是一种确定性密码生成算法，其输出只依赖于输入的�
 此时，密码数组中已经包含了满足基本复杂度的字符，接下来需要用更多“随机”字符填充至用户指定的 `length`。
 
 1. **创建确定性 RNG**：使用整个 32 字节主种子来初始化一个确定性的随机数生成器（ChaCha20）。
-    - 在 TypeScript 版本中，使用 `masterSeed` 作为 key，一个 12 字节的全零数组作为 nonce 来初始化 ChaCha20 流密码，这与 Rust [`rand_chacha`](https://crates.io/crates/rand_chacha) 库的默认行为完全一致，是跨平台兼容的关键。
+    - 为了保证跨平台（如 Rust 和 JavaScript）实现的一致性，RNG 的初始化参数被严格固定。例如，在使用 ChaCha20 时，nonce 固定为一个 12 字节的全零数组。
 
 2. **合并字符集**：将 `charsets` 数组中的所有字符合并成一个大的字符池。
 

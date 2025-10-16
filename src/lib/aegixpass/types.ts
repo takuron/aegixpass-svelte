@@ -5,6 +5,8 @@ export enum HashAlgorithm {
   Sha256 = 'sha256',
   Blake3 = 'blake3',
   Sha3_256 = 'sha3_256',
+  Argon2id = 'argon2id',
+  Scrypt = 'scrypt',
 }
 
 /**

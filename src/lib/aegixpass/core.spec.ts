@@ -16,59 +16,74 @@ import {
 
 // 3. 使用 'describe' 来创建一个测试套件
 describe('aegixPassGenerator with built-in presets', () => {
-  // --- 准备工作 ---
-  // 1. 定义一组所有测试用例都将使用的通用输入
-  const masterPassword = 'MySecretPassword123!';
-  const distinguishKey = 'example.com';
+    // --- 准备工作 ---
+    // 1. 定义一组所有测试用例都将使用的通用输入
+    const masterPassword = 'MySecretPassword123!';
+    const distinguishKey = 'example.com';
 
-  // 2. 加载所有内置的预设，我们将在测试中查找并使用它们
-  const allPresets = loadBuiltInPresets();
+    // 2. 加载所有内置的预设，我们将在测试中查找并使用它们
+    const allPresets = loadBuiltInPresets();
 
-  // 3. 定义我们的“对照表”。每一行代表一个测试用例。
-  //    你需要将 placeholder 替换为从你的 Rust/Java 实现中得到的真实密码。
-  const testCases = [
-    {
-      presetName: 'AegixPass - Default',
-      expectedPassword: 'tK2Vj^W&E-YVByG7',
-    },
-    {
-      presetName: 'AegixPass - NoSymbol',
-      expectedPassword: 'FRJuG7pq9LlidzZ9',
-    },
-    {
-      presetName: 'AegixPass - Pin',
-      expectedPassword: '693406',
-    },
-    {
-      presetName: 'AegixPass - Short',
-      expectedPassword: '+e%h_s5vC9',
-    },
-    {
-      presetName: 'AegixPass - Sha3',
-      expectedPassword: 'Md*FMyWCd!1KQG%H',
-    },
-  ];
+    // 3. 定义我们的“对照表”。每一行代表一个测试用例。
+    //    你需要将 placeholder 替换为从你的 Rust/Java 实现中得到的真实密码。
+    const testCases = [
+        {
+            presetName: 'AegixPass - Default',
+            expectedPassword: '0+JkyL%LQ3wNIP8p',
+        },
+        {
+            presetName: 'AegixPass - NoSymbol',
+            expectedPassword: 'uu2QHYLfD2c1SWi9',
+        },
+        {
+            presetName: 'AegixPass - Pin',
+            expectedPassword: '174520',
+        },
+        {
+            presetName: 'AegixPass - Short',
+            expectedPassword: 'W6=Qt$29L=',
+        },
+        {
+            presetName: 'AegixPass - Short|NoSymbol',
+            expectedPassword: 'Ue6WrGNpIY',
+        },
+        {
+            presetName: 'AegixPass - Sha256',
+            expectedPassword: 'tK2Vj^W&E-YVByG7',
+        },
+        {
+            presetName: 'AegixPass - Long',
+            expectedPassword: '+ifQgVimVKCD_WM%ZqP&W+-nsYu2wEH6',
+        },
+        {
+            presetName: 'AegixPass - Long|NoSymbol',
+            expectedPassword: 'ab8H8INYohXlKvnfwv4jn4WmRYu8MNa',
+        },
+    ];
 
-  // --- 参数化测试 ---
-  // it.each 会为 testCases 数组中的每一个对象都运行一次测试
-  it.each(testCases)('should correctly generate password for preset: $presetName', async ({ presetName, expectedPassword }) => {
-    // --- Arrange ---
-    // 从已加载的预设中，根据名称找到当前测试用例所需的预设
-    const preset = allPresets.find(p => p.name === presetName);
+    // --- 参数化测试 ---
+    // it.each 会为 testCases 数组中的每一个对象都运行一次测试
+    it.each(testCases)('should correctly generate password for preset: $presetName', async ({
+                                                                                                presetName,
+                                                                                                expectedPassword
+                                                                                            }) => {
+        // --- Arrange ---
+        // 从已加载的预设中，根据名称找到当前测试用例所需的预设
+        const preset = allPresets.find(p => p.name === presetName);
 
-    // 确保预设被找到了，这是一个很好的健壮性检查
-    expect(preset, `Preset named "${presetName}" should exist.`).toBeDefined();
+        // 确保预设被找到了，这是一个很好的健壮性检查
+        expect(preset, `Preset named "${presetName}" should exist.`).toBeDefined();
 
-    // --- Act ---
-    const generatedPassword = await aegixPassGenerator(
-      masterPassword,
-      distinguishKey,
-      preset as Preset // 我们已经用 toBeDefined 检查过，所以这里可以安全地断言
-    );
+        // --- Act ---
+        const generatedPassword = await aegixPassGenerator(
+            masterPassword,
+            distinguishKey,
+            preset as Preset // 我们已经用 toBeDefined 检查过，所以这里可以安全地断言
+        );
 
-    // --- Assert ---
-    expect(generatedPassword).toBe(expectedPassword);
-  });
+        // --- Assert ---
+        expect(generatedPassword).toBe(expectedPassword);
+    });
 });
 
 describe('aegixPassGenerator with edge case inputs', () => {
@@ -110,25 +125,31 @@ describe('aegixPassGenerator with edge case inputs', () => {
         // Case 4: 密码长度刚好等于字符集数量
         {
             caseName: 'should work when password length equals the number of charsets',
-            preset: { ...basicPreset, length: 4 }, // length (4) === charsets.length (4)
+            preset: {...basicPreset, length: 4}, // length (4) === charsets.length (4)
             expectedToThrow: false
         },
         // Case 5: 字符集中包含重复字符 (算法应该能正常处理)
         {
             caseName: 'should handle duplicate characters within charsets',
-            preset: { ...basicPreset, length: 10, charsets: ['aabc', 'ddee', 'ffgg'] },
+            preset: {...basicPreset, length: 10, charsets: ['aabc', 'ddee', 'ffgg']},
             expectedToThrow: false
         },
         // Case 6: 字符集中包含 Unicode 字符
         {
             caseName: 'should handle Unicode characters in charsets',
-            preset: { ...basicPreset, length: 10, charsets: ['你好', '🚀', 'AB'] },
+            preset: {...basicPreset, length: 10, charsets: ['你好', '🚀', 'AB']},
             expectedToThrow: false
         }
     ];
 
     // --- 运行测试 ---
-    edgeCaseInputs.forEach(({ caseName, masterPassword = 'default', distinguishKey = 'default', preset = basicPreset, expectedToThrow }) => {
+    edgeCaseInputs.forEach(({
+                                caseName,
+                                masterPassword = 'default',
+                                distinguishKey = 'default',
+                                preset = basicPreset,
+                                expectedToThrow
+                            }) => {
         it(caseName, async () => {
             if (expectedToThrow) {
                 // 对于预期会抛出错误的用例
@@ -175,14 +196,14 @@ describe('aegixPassGenerator input validation', () => {
     });
 
     it('should throw if password length is less than number of charsets', async () => {
-        const presetWithShortLength = { ...validPreset, length: 2, charsets: ['a', 'b', 'c'] };
+        const presetWithShortLength = {...validPreset, length: 2, charsets: ['a', 'b', 'c']};
         await expect(
             aegixPassGenerator('password', 'example.com', presetWithShortLength)
         ).rejects.toThrow(/Password length \(2\) is too short for 3 charset groups/);
     });
 
     it('should throw if a charset group is empty', async () => {
-        const presetWithEmptyCharset = { ...validPreset, charsets: ['a', 'b', ''] };
+        const presetWithEmptyCharset = {...validPreset, charsets: ['a', 'b', '']};
         await expect(
             aegixPassGenerator('password', 'example.com', presetWithEmptyCharset)
         ).rejects.toThrow('All charset groups must contain at least one character.');

@@ -1,7 +1,7 @@
 {
-  "name": "AegixPass - Sha3",
+  "name": "AegixPass - Sha256",
   "version": 1,
-  "hashAlgorithm": "sha3_256",
+  "hashAlgorithm": "sha256",
   "rngAlgorithm": "chaCha20",
   "shuffleAlgorithm": "fisherYates",
   "length": 16,

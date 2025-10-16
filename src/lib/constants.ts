@@ -7,7 +7,7 @@ export const CUSTOM_PRESET_STORAGE_KEY = 'aegixpass-custom-preset';
 export const DEFAULT_CUSTOM_PRESET: Preset = {
     name: 'Custom - Default',
     version: 1,
-    hashAlgorithm: HashAlgorithm.Sha256,
+    hashAlgorithm: HashAlgorithm.Argon2id,
     rngAlgorithm: RngAlgorithm.ChaCha20,
     shuffleAlgorithm: ShuffleAlgorithm.FisherYates,
     length: 16,
