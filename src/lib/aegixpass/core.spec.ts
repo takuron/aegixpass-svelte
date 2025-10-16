@@ -57,7 +57,7 @@ describe('aegixPassGenerator with built-in presets', () => {
         },
         {
             presetName: 'AegixPass - Long|NoSymbol',
-            expectedPassword: 'ab8H8INYohXlKvnfwv4jn4WmRYu8MNa',
+            expectedPassword: 'ab8H8INYohXlKvnfwv4jn4WmRYu8MNaq',
         },
     ];
 
