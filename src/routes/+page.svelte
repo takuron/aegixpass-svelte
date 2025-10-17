@@ -2,7 +2,6 @@
     // --- 1. 导入依赖 ---
     import { onMount } from 'svelte';
     import {
-        aegixPassGenerator,
         loadBuiltInPresets,
         AegixPassError,
         type Preset,
