@@ -6,7 +6,7 @@
         loadBuiltInPresets,
         AegixPassError,
         type Preset,
-        parseAndValidatePreset
+        parseAndValidatePreset, aegixPassGeneratorAsync
     } from '$lib/aegixpass';
     // 从共享的常量文件中导入 localStorage 键和默认的自定义预设对象
     import { CUSTOM_PRESET_STORAGE_KEY, DEFAULT_CUSTOM_PRESET } from '$lib/constants';
@@ -73,29 +73,24 @@
             return;
         }
 
-        // 重置状态
-        generatedPassword = '';
         isLoading = true;
+        generatedPassword = '';
+
         try {
-            // 调用核心的密码生成函数
-            generatedPassword = await aegixPassGenerator(
+            // 像调用普通 async 函数一样调用我们的 Worker 封装！
+            // 主线程在这里不会被阻塞，UI 会立刻更新。
+            generatedPassword = await aegixPassGeneratorAsync(
                 masterPassword,
                 siteKey,
-                selectedPreset as Preset // 断言 selectedPreset 已被 onMount 初始化
+                selectedPreset
             );
         } catch (e) {
-            // 如果生成过程中发生错误
             console.error(e);
-            // 检查错误类型并设置相应的提示信息
-            if (e instanceof AegixPassError) {
+            if (e instanceof AegixPassError || e instanceof Error) {
                 errorMsg = e.message;
-                errorModal.showModal(); // 显示错误模态框
-            } else if (e instanceof Error) {
-                errorMsg = '发生了一个未知错误：' + e.message;
-                errorModal.showModal(); // 显示错误模态框
+                errorModal.showModal();
             }
         } finally {
-            // 无论成功或失败，都结束加载状态
             isLoading = false;
         }
     }
@@ -163,29 +158,33 @@
         <div class="card-actions justify-end mt-6">
             <button class="btn btn-primary w-full" type="submit" disabled={isLoading}>
                 {#if isLoading}
-                    <span class="loading loading-spinner"></span>
-                    正在生成...
+                    正在生成
                 {:else}
                     生成密码
                 {/if}
             </button>
         </div>
 
-        {#if generatedPassword}
-            <div class="mt-6 space-y-2">
-                <div class="label"><span class="label-text">生成的密码:</span></div>
-                <div class="mockup-code relative">
-                    <pre class="px-4 py-2"><code>{generatedPassword}</code></pre>
-                    <button
-                            class="btn btn-ghost btn-sm absolute top-2 right-2"
-                            on:click={handleCopy}
-                            type="button"
-                    >
-                        {copySuccess ? '✅ 已复制' : '📋 复制'}
-                    </button>
+        <div class="mt-6 space-y-2">
+            {#if isLoading}
+                <div class="flex justify-center items-center h-full my-10">
+                    <span class="loading loading-dots loading-lg"></span>
                 </div>
-            </div>
-        {/if}
+            {:else if generatedPassword}
+                <div>
+                    <div class="mockup-code relative">
+                        <pre class="px-4 py-2 whitespace-pre-wrap break-all"><code>{generatedPassword}</code></pre>
+                        <button
+                                class="btn btn-ghost btn-sm absolute top-2 right-2"
+                                on:click={handleCopy}
+                                type="button"
+                        >
+                            {copySuccess ? '✅ 已复制' : '📋 复制'}
+                        </button>
+                    </div>
+                </div>
+            {/if}
+        </div>
     </form>
 </div>
 

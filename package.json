@@ -1,7 +1,7 @@
 {
   "name": "aegixpass-svelte",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A secure, deterministic password generator web app built with SvelteKit. All calculations are performed client-side.",
   "author": "Takuron <takuron@163.com> (https://takuron.com/)",
   "license": "LGPL-2.1-only",
