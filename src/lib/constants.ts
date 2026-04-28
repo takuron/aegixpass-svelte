@@ -8,7 +8,7 @@ import {
 export const CUSTOM_PRESET_STORAGE_KEY = 'aegixpass-custom-preset';
 
 export const DEFAULT_CUSTOM_PRESET: PresetV2 = {
-    name: 'Custom - Default',
+    name: 'AegixPass - Custom',
     version: 2,
     fastHashAlgorithm: FastHashAlgorithm.Sha256,
     slowHashAlgorithm: SlowHashAlgorithm.Argon2id,
