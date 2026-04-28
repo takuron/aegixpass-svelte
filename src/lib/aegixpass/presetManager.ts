@@ -7,7 +7,8 @@ import {
     ShuffleAlgorithm,
     type Preset,
     type PresetV1,
-    type PresetV2
+    type PresetV2,
+    type PresetIndexItem
 } from './types';
 
 // --- 类型守卫函数 ---
@@ -186,11 +187,105 @@ export function loadBuiltInPresetsV2(): PresetV2[] {
 }
 
 /**
+ * 从 index.json 文件加载预设索引。
+ * @returns {PresetIndexItem[]} 预设索引项数组。
+ */
+function loadPresetIndex(): PresetIndexItem[] {
+    try {
+        const indexModule = import.meta.glob('/static/preset/index.json', {
+            eager: true,
+            query: '?raw',
+            import: 'default'
+        });
+
+        const indexPath = Object.keys(indexModule)[0];
+        if (!indexPath) {
+            console.warn('Preset index file not found, falling back to legacy loading.');
+            return [];
+        }
+
+        const indexContent = indexModule[indexPath] as string;
+        return JSON.parse(indexContent) as PresetIndexItem[];
+    } catch (error) {
+        console.error('Failed to load preset index:', error);
+        return [];
+    }
+}
+
+/**
+ * 根据预设索引项加载单个预设文件。
+ * @param indexItem 预设索引项
+ * @returns {Preset | null} 加载的预设对象，如果加载失败则返回 null
+ */
+function loadPresetByIndexItem(indexItem: PresetIndexItem): Preset | null {
+    try {
+        // 构建文件路径，注意：import.meta.glob 需要相对于项目根的路径
+        const filePath = `/static${indexItem.file}`;
+        
+        // 使用 import.meta.glob 加载指定的预设文件
+        const presetModules = import.meta.glob('/static/preset/**/*.json', {
+            eager: true,
+            query: '?raw',
+            import: 'default'
+        });
+
+        // 查找匹配的文件
+        let matchedPath: string | undefined;
+        for (const path in presetModules) {
+            if (path === filePath || path.endsWith(indexItem.file)) {
+                matchedPath = path;
+                break;
+            }
+        }
+
+        if (!matchedPath) {
+            console.error(`Preset file not found: ${indexItem.file}`);
+            return null;
+        }
+
+        const jsonContent = presetModules[matchedPath];
+        const parsedJson = JSON.parse(jsonContent as string);
+        return validateAndTransformObjectToPreset(parsedJson);
+    } catch (error) {
+        console.error(`Failed to load preset from ${indexItem.file}:`, error);
+        return null;
+    }
+}
+
+/**
  * 加载所有内置的预设文件。
- * 优先加载 V2 预设，同时保留对 V1 预设的支持。
+ * 从 index.json 读取预设列表，并根据 hide 属性过滤。
+ * 同时保留对旧版加载方式的兼容。
  * @returns {Preset[]} 一个包含所有内置预设的数组。
  */
 export function loadBuiltInPresets(): Preset[] {
+    // 首先尝试从 index.json 加载
+    const presetIndex = loadPresetIndex();
+    
+    if (presetIndex.length > 0) {
+        const presets: Preset[] = [];
+        
+        for (const indexItem of presetIndex) {
+            // 跳过隐藏的预设
+            if (indexItem.hide) {
+                continue;
+            }
+            
+            const preset = loadPresetByIndexItem(indexItem);
+            if (preset) {
+                // 确保预设名称与 index.json 中的名称一致
+                preset.name = indexItem.name;
+                presets.push(preset);
+            }
+        }
+        
+        if (presets.length > 0) {
+            return presets;
+        }
+    }
+    
+    // 回退到旧的加载方式
+    console.warn('Using legacy preset loading method.');
     const presetsV2 = loadBuiltInPresetsV2();
     if (presetsV2.length > 0) {
         return presetsV2;

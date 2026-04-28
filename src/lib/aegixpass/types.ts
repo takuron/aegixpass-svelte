@@ -74,6 +74,15 @@ export interface PresetV2 {
 export type Preset = PresetV1 | PresetV2;
 
 /**
+ * 预设索引项，用于 index.json 文件中定义预设列表。
+ */
+export interface PresetIndexItem {
+  name: string;
+  file: string;
+  hide?: boolean;
+}
+
+/**
  * V1 哈希算法枚举 (遗留)。
  */
 export enum HashAlgorithm {
