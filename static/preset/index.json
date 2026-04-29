@@ -1,0 +1,67 @@
+[
+  {
+    "name": "AegixPass V2 - Default",
+    "file": "/preset/v2/default.json"
+  },
+  {
+    "name": "AegixPass V2 - NoSymbol",
+    "file": "/preset/v2/no-symbol.json"
+  },
+  {
+    "name": "AegixPass V2 - Pin",
+    "file": "/preset/v2/pin.json"
+  },
+  {
+    "name": "AegixPass V2 - Short",
+    "file": "/preset/v2/short.json"
+  },
+  {
+    "name": "AegixPass V2 - Short|NoSymbol",
+    "file": "/preset/v2/short-no-symbol.json"
+  },
+  {
+    "name": "AegixPass V2 - Long",
+    "file": "/preset/v2/long.json"
+  },
+  {
+    "name": "AegixPass V2 - Long|NoSymbol",
+    "file": "/preset/v2/long-no-symbol.json"
+  },
+  {
+    "name": "AegixPass V1 - Default",
+    "file": "/preset/v1/default.json"
+  },
+  {
+    "name": "AegixPass V1 - Long",
+    "file": "/preset/v1/long.json"
+  },
+  {
+    "name": "AegixPass V1 - Pin",
+    "file": "/preset/v1/pin.json"
+  },
+  {
+    "name": "AegixPass V1 - NoSymbol",
+    "file": "/preset/v1/no-symbol.json",
+    "hide": true
+  },
+  {
+    "name": "AegixPass V1 - Sha256",
+    "file": "/preset/v1/sha256.json",
+    "hide": true
+  },
+  {
+    "name": "AegixPass V1 - Short",
+    "file": "/preset/v1/short.json",
+    "hide": true
+  },
+  {
+    "name": "AegixPass V1 - Short|NoSymbol",
+    "file": "/preset/v1/short-no-symbol.json",
+    "hide": true
+  },
+  {
+    "name": "AegixPass V1 - Long|NoSymbol",
+    "file": "/preset/v1/long-no-symbol.json",
+    "hide": true
+  }
+]

@@ -11,25 +11,57 @@ import {blake3} from '@noble/hashes/blake3.js';
 import {chacha20} from '@noble/ciphers/chacha.js';
 // 从项目的类型定义文件中导入错误类和枚举类型。
 // 这有助于保持代码的类型安全和一致性。
-import {AegixPassError, HashAlgorithm, RngAlgorithm, type Preset} from './types';
+import {
+    AegixPassError,
+    FastHashAlgorithm,
+    SlowHashAlgorithm,
+    RngAlgorithm,
+    HashAlgorithm,
+    type Preset,
+    type PresetV1,
+    type PresetV2
+} from './types';
 import {argon2id} from "@noble/hashes/argon2.js";
 import {scrypt} from "@noble/hashes/scrypt.js";
 
 
+// --- 2. 类型守卫函数 ---
+/**
+ * 检查预设是否为 V2 版本。
+ * @param preset 预设对象
+ * @returns 是否为 V2 预设
+ */
+function isPresetV2(preset: Preset): preset is PresetV2 {
+    return preset.version === 2;
+}
+
+/**
+ * 检查预设是否为 V1 版本。
+ * @param preset 预设对象
+ * @returns 是否为 V1 预设
+ */
+function isPresetV1(preset: Preset): preset is PresetV1 {
+    return preset.version === 1;
+}
+
+
 // --- 3. 关键辅助函数：无偏的范围随机数生成器 ---
 /**
- * 使用“拒绝采样”方法，从一个 u32 随机数生成器中，安全地生成一个在 [0, max) 范围内的无偏随机整数。
+ * 使用"拒绝采样"方法，从一个 u32 随机数生成器中，安全地生成一个在 [0, max) 范围内的无偏随机整数。
  * 这个函数的数学逻辑与 AegixPass Rust 实现中的 `secure_random_range_u32` 完全等价，是保证跨平台一致性的核心。
  * @param next_u32 一个返回 32 位无符号整数 (0 到 2^32 - 1) 的函数。
  * @param max 范围的上限（不包含）。
  * @returns 一个在 [0, max) 范围内的、无偏差的随机整数。
  */
 function secureRandomRange_u32(next_u32: () => number, max: number): number {
+    if (!Number.isSafeInteger(max) || max <= 0 || max > 4294967295) {
+        throw new AegixPassError(`Random range max must be an integer in [1, 4294967295], got ${max}.`);
+    }
     // 别名，使代码更易读
     const range = max;
     // u32 的最大值 (2^32 - 1)，用于计算拒绝采样的阈值
     const U32_MAX = 4294967295;
-    // 计算“有效区域”的阈值。
+    // 计算"有效区域"的阈值。
     // 这是 `range` 的最大倍数，且小于等于 U32_MAX。
     // 只有当随机数小于这个阈值时才会被接受，这样可以完美避免简单取模运算带来的偏差。
     // 例如，如果 max=3, U32_MAX=10，那么 zone = 10 - (10 % 3) = 9。
@@ -40,22 +72,20 @@ function secureRandomRange_u32(next_u32: () => number, max: number): number {
     do {
         // 从我们的 chacha20 流中获取下一个 u32 随机数
         v = next_u32();
-        // 如果 v 落在了“无效区域”（即 v >= zone），则丢弃它，重新取一个，直到它落在有效区域内为止。
+        // 如果 v 落在了"无效区域"（即 v >= zone），则丢弃它，重新取一个，直到它落在有效区域内为止。
     } while (v >= zone);
 
     // 因为 v 保证在有效区域内，所以这次取模是完全无偏的，每个结果的概率都相等。
     return v % range;
 }
 
-// --- 5. 辅助函数：生成主种子 ---
+
+// --- 4. V1 算法实现（遗留兼容） ---
 /**
- * 根据所有影响密码生成的参数和用户输入，通过哈希运算生成一个 32 字节的确定性主种子 (Master Seed)。
- * 这个种子是后续所有伪随机操作的唯一来源。
- * @returns {Promise<Uint8Array>} 返回一个 Promise，解析为一个 32 字节的 Uint8Array 格式的种子。
+ * V1 版本的主种子生成函数。
  */
-async function generateMasterSeed(password_source: string, distinguish_key: string, preset: Preset): Promise<Uint8Array> {
+async function generateMasterSeedV1(password_source: string, distinguish_key: string, preset: PresetV1): Promise<Uint8Array> {
     // 严格按照算法文档定义的格式，将所有输入拼接成一个唯一的长字符串。
-    // 这种设计确保了预设中的任何一个参数（甚至是 `charsets` 的顺序）发生变化，都会生成一个完全不同的种子。
     const charsetsJson = JSON.stringify(preset.charsets);
     const inputData = `AegixPass_V${preset.version}:${preset.platformId}:${preset.length}:${password_source}:${distinguish_key}:${charsetsJson}`;
 
@@ -96,28 +126,20 @@ async function generateMasterSeed(password_source: string, distinguish_key: stri
             // 3. 执行 Scrypt 密钥派生
             return scrypt(encodedInput, salt, opts);
         }
-        // 如果预设中的算法不被支持，则抛出错误。
         default:
             throw new Error(`Unsupported hash algorithm: ${preset.hashAlgorithm}`);
     }
 }
 
-// --- 4. 核心密码生成函数 ---
 /**
- * 主函数，根据给定的主密码、区分密钥和预设配置，确定性地生成最终的密码。
- * 严格遵循 ALGORITHM.md 中定义的流程。
- * @param password_source 你的主密码，核心机密。
- * @param distinguish_key 用于为不同服务（如网站域名）生成不同密码的变量。
- * @param preset 密码生成的所有参数配置。
- * @returns {Promise<string>} 返回一个 Promise，解析为最终生成的密码字符串。
+ * V1 版本的密码生成函数。
  */
-export async function aegixPassGenerator(
+async function aegixPassGeneratorV1(
     password_source: string,
     distinguish_key: string,
-    preset: Preset
+    preset: PresetV1
 ): Promise<string> {
     // --- (阶段 A) 输入验证 ---
-    // 在开始计算前，进行严格的输入检查，以避免产生不安全或无效的结果。
     if (!password_source || !distinguish_key) {
         throw new AegixPassError('Master password and distinguish key cannot be empty.');
     }
@@ -128,18 +150,18 @@ export async function aegixPassGenerator(
         throw new AegixPassError('All charset groups must contain at least one character.');
     }
     if (preset.rngAlgorithm !== RngAlgorithm.ChaCha20) {
-        throw new AegixPassError(`This implementation only supports the 'chaCha20' RNG algorithm.`);
+        throw new AegixPassError(`This implementation only supports the 'chaCha20' RNG algorithm for V1 presets.`);
     }
 
     // --- (阶段 B) 生成主种子 ---
-    // 这是整个确定性算法的基石。
-    const masterSeed = await generateMasterSeed(password_source, distinguish_key, preset);
+    const masterSeed = await generateMasterSeedV1(password_source, distinguish_key, preset);
     // 初始化一个数组，用于存放最终密码的字符。
     let finalPasswordChars: string[] = [];
 
     // --- (阶段 C) 保证每个字符集至少出现一次 (字符集保证) ---
-    // 为了满足现代密码的复杂度要求，算法会确定性地从每个 `charsets` 分组中挑选一个字符。
+    // V1 实现：使用 master_seed 的切片直接生成索引
     for (const [i, charsetGroup] of preset.charsets.entries()) {
+        const chars = Array.from(charsetGroup);
         // 将 32 字节的主种子按顺序分割成多个 4 字节的块。
         const startIndex = i * 4;
         // 取出第 i 个 4 字节块。
@@ -148,19 +170,17 @@ export async function aegixPassGenerator(
         // 将这个块解释为一个无符号 32 位整数（小端序）。
         const index_seed = dataView.getUint32(0, true); // `true` 表示 little-endian
         // 使用这个整数对当前字符集的长度进行取模运算，得到一个索引。
-        const char_index = index_seed % charsetGroup.length;
+        const char_index = index_seed % chars.length;
         // 将该索引对应的字符添加到初始密码数组中。
-        finalPasswordChars.push(charsetGroup[char_index]!); // `!` 是非空断言，因为我们已在阶段 A 验证过 charsetGroup 不为空
+        finalPasswordChars.push(chars[char_index]!);
     }
 
     // --- 准备确定性随机数生成器 (RNG) ---
     // 使用整个 32 字节主种子来初始化 ChaCha20。
     const key = masterSeed;
     // 使用一个 12 字节的全零数组作为 nonce。
-    // 这是为了与 Rust `rand_chacha` 库的默认行为完全一致，是跨平台兼容的关键。
     const nonce = new Uint8Array(12).fill(0);
     // 生成一个足够长的随机字节流 (4KB)，供后续所有随机操作使用。
-    // ChaCha20 是流密码，可以生成任意长度的伪随机字节。
     const randomByteStream = chacha20(key, nonce, new Uint8Array(4096));
 
     // 定义一个从字节流中持续提取 u32 数字的辅助函数。
@@ -175,35 +195,247 @@ export async function aegixPassGenerator(
     };
 
     // --- (阶段 D) 填充密码剩余长度 ---
-    // 计算还需要填充多少个字符
     const remainingLen = preset.length - finalPasswordChars.length;
     if (remainingLen > 0) {
-        // 将所有字符集中的字符合并成一个大的字符池
         const combinedCharsetStr = preset.charsets.join('');
-        const combinedCharset = combinedCharsetStr.split('');
+        const combinedCharset = Array.from(combinedCharsetStr);
         const combinedLen = combinedCharset.length;
 
-        // 循环填充剩余长度的每一个位置
         for (let i = 0; i < remainingLen; i++) {
-            // 使用无偏的范围随机数生成器，从字符池中公平地选择一个字符的索引
             const j = secureRandomRange_u32(next_u32, combinedLen);
-            // 将选出的字符添加到密码数组中
             finalPasswordChars.push(combinedCharset[j]!);
         }
     }
 
     // --- (阶段 E) 最终整体洗牌 (Fisher-Yates Shuffle) ---
-    // 为了消除阶段 C 中引入的、保证性字符位置的任何可预测性，
-    // 需要对整个密码数组进行最后一次确定性的洗牌。
-    // 从后向前遍历密码数组
     for (let i = finalPasswordChars.length - 1; i > 0; i--) {
-        // 使用 RNG 生成一个 `[0, i]` 范围内的随机索引 `j`
         const j = secureRandomRange_u32(next_u32, i + 1);
-        // 交换位置 `i` 和 `j` 的字符
         [finalPasswordChars[i], finalPasswordChars[j]] = [finalPasswordChars[j]!, finalPasswordChars[i]!];
     }
 
     // --- (阶段 F) 组合并返回结果 ---
-    // 将最终洗牌后的字符数组组合成一个字符串。
     return finalPasswordChars.join('');
+}
+
+
+// --- 5. V2 算法实现 ---
+
+/**
+ * 使用指定的快哈希算法计算输入数据的哈希值。
+ * @param data 输入字符串
+ * @param algorithm 快哈希算法
+ * @returns 32 字节的哈希值
+ */
+function computeFastHash(data: string, algorithm: FastHashAlgorithm): Uint8Array {
+    const encodedData = new TextEncoder().encode(data);
+    switch (algorithm) {
+        case FastHashAlgorithm.Sha256:
+            return nobleSha256(encodedData);
+        case FastHashAlgorithm.Blake3:
+            return blake3(encodedData);
+        case FastHashAlgorithm.Sha3_256:
+            return sha3_256(encodedData);
+        default:
+            throw new Error(`Unsupported fast hash algorithm: ${algorithm}`);
+    }
+}
+
+/**
+ * 将 32 字节的哈希值转换为小写十六进制字符串。
+ * @param hash 32 字节的哈希值
+ * @returns 64 个字符的小写十六进制字符串
+ */
+function hashToHex(hash: Uint8Array): string {
+    return Array.from(hash)
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+/**
+ * V2 版本的主种子生成函数。
+ * 
+ * V2 算法流程：
+ * 1. 使用快哈希算法计算盐值（platform_id）的哈希
+ * 2. 使用快哈希算法计算原始密码的哈希
+ * 3. 按照v1的方法组合字符串（将原始密码替换为快哈希后的密码的十六进制表示）
+ * 4. 用这个组合字符串作为原文，快哈希处理后的盐值作为慢哈希的盐，
+ *    用慢哈希算法算出32位主种子
+ */
+async function generateMasterSeedV2(
+    password_source: string,
+    distinguish_key: string,
+    preset: PresetV2
+): Promise<Uint8Array> {
+    // --- 步骤 1: 使用快哈希算法计算盐值（platform_id）的哈希 ---
+    const fastHashedSalt = computeFastHash(preset.platformId, preset.fastHashAlgorithm);
+
+    // --- 步骤 2: 使用快哈希算法计算原始密码的哈希 ---
+    const fastHashedPassword = computeFastHash(password_source, preset.fastHashAlgorithm);
+
+    // --- 步骤 3: 按照v1的方法组合字符串（将原始密码替换为快哈希后的密码的十六进制表示） ---
+    // 格式："AegixPass_V{version}:{platform_id}:{length}:{fast_hashed_password_hex}:{distinguish_key}:{charsets_json}"
+    const charsetsJson = JSON.stringify(preset.charsets);
+    const fastHashedPasswordHex = hashToHex(fastHashedPassword);
+
+    const inputData = `AegixPass_V${preset.version}:${preset.platformId}:${preset.length}:${fastHashedPasswordHex}:${distinguish_key}:${charsetsJson}`;
+    const encodedInput = new TextEncoder().encode(inputData);
+
+    // --- 步骤 4: 用慢哈希算法计算主种子 ---
+    // 原文：input_data（组合字符串）
+    // 盐值：fast_hashed_salt（快哈希处理后的盐值）
+    switch (preset.slowHashAlgorithm) {
+        case SlowHashAlgorithm.Argon2id: {
+            // Argon2id 参数：
+            // m_cost: 内存成本 (19456 KB = 19 MiB)
+            // t_cost: 时间成本 (2 次迭代)
+            // p_cost: 并行度 (1 个线程)
+            const opts = {
+                m: 19456,
+                t: 2,
+                p: 1,
+                dkLen: 32
+            };
+            return argon2id(encodedInput, fastHashedSalt, opts);
+        }
+        case SlowHashAlgorithm.Scrypt: {
+            // Scrypt 参数：
+            // N: CPU/内存成本参数 (2^15 = 32768)
+            // r: 块大小 (8)
+            // p: 并行化参数 (1)
+            const opts = {
+                N: 2 ** 15,
+                r: 8,
+                p: 1,
+                dkLen: 32
+            };
+            return scrypt(encodedInput, fastHashedSalt, opts);
+        }
+        default:
+            throw new Error(`Unsupported slow hash algorithm: ${preset.slowHashAlgorithm}`);
+    }
+}
+
+/**
+ * 从主种子和预设算法创建一个确定性随机数生成器 (RNG)。
+ * @param seed 32 字节的主种子
+ * @param rngAlgorithm RNG 算法
+ * @returns 一个返回 u32 随机数的函数
+ */
+function createRngFromSeed(seed: Uint8Array, rngAlgorithm: RngAlgorithm): () => number {
+    switch (rngAlgorithm) {
+        case RngAlgorithm.ChaCha20: {
+            // 使用一个 12 字节的全零数组作为 nonce
+            const nonce = new Uint8Array(12).fill(0);
+            const blockSize = 4096;
+            let counter = 0;
+            let randomByteStream: Uint8Array<ArrayBufferLike> = new Uint8Array(0);
+            let byteIndex = 0;
+
+            const refill = () => {
+                randomByteStream = chacha20(seed, nonce, new Uint8Array(blockSize), undefined, counter);
+                counter += blockSize / 64;
+                byteIndex = 0;
+            };
+
+            return (): number => {
+                if (byteIndex + 4 > randomByteStream.length) {
+                    refill();
+                }
+                const view = new DataView(randomByteStream.buffer, byteIndex, 4);
+                byteIndex += 4;
+                return view.getUint32(0, true);
+            };
+        }
+        case RngAlgorithm.Hc128:
+            // HC128 是可选实现，当前 @noble/ciphers 不支持
+            throw new AegixPassError(`HC128 RNG algorithm is not supported in this implementation. Please use ChaCha20 instead.`);
+        default:
+            throw new Error(`Unsupported RNG algorithm: ${rngAlgorithm}`);
+    }
+}
+
+/**
+ * V2 版本的密码生成函数。
+ */
+async function aegixPassGeneratorV2(
+    password_source: string,
+    distinguish_key: string,
+    preset: PresetV2
+): Promise<string> {
+    // --- (阶段 A) 输入验证 ---
+    if (!password_source || !distinguish_key) {
+        throw new AegixPassError('Master password (passwordSource) and distinguish key (distinguishKey) cannot be empty.');
+    }
+    if (preset.version !== 2) {
+        throw new AegixPassError(`Unsupported preset version: ${preset.version}. AegixPass only supports version 2.`);
+    }
+    if (preset.length < preset.charsets.length) {
+        throw new AegixPassError(`Password length (${preset.length}) is too short to guarantee inclusion of characters from all ${preset.charsets.length} charset groups.`);
+    }
+    if (preset.charsets.some(cs => cs.length === 0)) {
+        throw new AegixPassError('All charset groups must contain at least one character.');
+    }
+
+    // --- (阶段 B) 生成主种子 ---
+    const masterSeed = await generateMasterSeedV2(password_source, distinguish_key, preset);
+
+    // 从种子创建 RNG 实例
+    const next_u32 = createRngFromSeed(masterSeed, preset.rngAlgorithm);
+
+    // --- (阶段 C) 保证每个字符集至少出现一次 (V2: 使用 RNG 直接) ---
+    let finalPasswordChars: string[] = [];
+    for (const charsetGroup of preset.charsets) {
+        const chars = Array.from(charsetGroup);
+        const charIndex = secureRandomRange_u32(next_u32, chars.length);
+        finalPasswordChars.push(chars[charIndex]!);
+    }
+
+    // --- (阶段 D) 填充密码剩余长度 ---
+    const remainingLen = preset.length - finalPasswordChars.length;
+    if (remainingLen > 0) {
+        const combinedCharsetStr = preset.charsets.join('');
+        const combinedCharset = Array.from(combinedCharsetStr);
+        const combinedLen = combinedCharset.length;
+
+        // 循环随机抽样
+        for (let i = 0; i < remainingLen; i++) {
+            const j = secureRandomRange_u32(next_u32, combinedLen);
+            finalPasswordChars.push(combinedCharset[j]!);
+        }
+    }
+
+    // --- (阶段 E) 最终整体洗牌 ---
+    // Fisher-Yates 洗牌
+    for (let i = finalPasswordChars.length - 1; i > 0; i--) {
+        const j = secureRandomRange_u32(next_u32, i + 1);
+        [finalPasswordChars[i], finalPasswordChars[j]] = [finalPasswordChars[j]!, finalPasswordChars[i]!];
+    }
+
+    // --- (阶段 F) 组合并返回结果 ---
+    return finalPasswordChars.join('');
+}
+
+
+// --- 6. 统一的入口函数 ---
+
+/**
+ * 主函数，根据给定的主密码、区分密钥和预设配置，确定性地生成最终的密码。
+ * 根据预设版本自动选择 V1 或 V2 算法。
+ * @param password_source 你的主密码，核心机密。
+ * @param distinguish_key 用于为不同服务（如网站域名）生成不同密码的变量。
+ * @param preset 密码生成的所有参数配置。
+ * @returns {Promise<string>} 返回一个 Promise，解析为最终生成的密码字符串。
+ */
+export async function aegixPassGenerator(
+    password_source: string,
+    distinguish_key: string,
+    preset: Preset
+): Promise<string> {
+    if (isPresetV2(preset)) {
+        return aegixPassGeneratorV2(password_source, distinguish_key, preset);
+    } else if (isPresetV1(preset)) {
+        return aegixPassGeneratorV1(password_source, distinguish_key, preset);
+    } else {
+        throw new AegixPassError(`Unsupported preset version: ${(preset as any).version}`);
+    }
 }
