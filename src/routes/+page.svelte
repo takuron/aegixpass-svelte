@@ -1,6 +1,7 @@
 <script lang="ts">
     // --- 1. 导入依赖 ---
     import { onMount } from 'svelte';
+    import { afterNavigate } from '$app/navigation';
     import {
         loadBuiltInPresets,
         AegixPassError,
@@ -30,39 +31,67 @@
     let errorMsg = '';
     let errorModal: HTMLDialogElement; // 用于绑定 <dialog> DOM 元素
 
-    // --- 3. 组件生命周期函数 (Lifecycle Function) ---
-    // onMount 会在组件首次渲染到 DOM 后执行一次
-    onMount(() => {
+    // --- 3. 辅助函数 ---
+    /**
+     * 从 localStorage 加载自定义预设
+     */
+    function loadCustomPreset(): Preset {
+        const savedPresetString = localStorage.getItem(CUSTOM_PRESET_STORAGE_KEY);
+        if (savedPresetString) {
+            try {
+                return parseAndValidatePreset(savedPresetString);
+            } catch (e) {
+                console.error('Failed to load custom preset from localStorage, using default.', e);
+                return DEFAULT_CUSTOM_PRESET;
+            }
+        } else {
+            return DEFAULT_CUSTOM_PRESET;
+        }
+    }
+
+    /**
+     * 重新加载所有预设（内置 + 自定义）
+     */
+    function reloadPresets() {
         // 步骤 1: 加载所有内置的 JSON 预设文件
         const builtInPresets = loadBuiltInPresets();
 
         // 步骤 2: 尝试从浏览器的 localStorage 中加载用户保存的自定义预设
-        let customPreset: Preset;
-        const savedPresetString = localStorage.getItem(CUSTOM_PRESET_STORAGE_KEY);
-        if (savedPresetString) {
-            try {
-                // 如果找到了，就解析并验证它
-                customPreset = parseAndValidatePreset(savedPresetString);
-            } catch (e) {
-                // 如果解析或验证失败，打印错误并使用默认的自定义预设作为备用
-                console.error('Failed to load custom preset from localStorage, using default.', e);
-                customPreset = DEFAULT_CUSTOM_PRESET;
-            }
-        } else {
-            // 如果没找到，直接使用默认的自定义预设
-            customPreset = DEFAULT_CUSTOM_PRESET;
-        }
+        const customPreset = loadCustomPreset();
 
-        // 步骤 3: 将内置预设和自定义预设组合成一个完整的列表
+        // 步骤 3: 记住当前选中的预设名称（如果有）
+        const previouslySelectedName = selectedPreset?.name;
+
+        // 步骤 4: 将内置预设和自定义预设组合成一个完整的列表
         availablePresets = [...builtInPresets, customPreset];
 
-        // 步骤 4: 如果列表不为空，默认选中第一个预设
+        // 步骤 5: 恢复选中状态（优先选择之前选中的预设，如果不存在则选择第一个）
         if (availablePresets.length > 0) {
+            if (previouslySelectedName) {
+                const foundPreset = availablePresets.find(p => p.name === previouslySelectedName);
+                if (foundPreset) {
+                    selectedPreset = foundPreset;
+                    return;
+                }
+            }
+            // 如果没有找到之前选中的预设，选择第一个
             selectedPreset = availablePresets[0];
         }
+    }
+
+    // --- 4. 组件生命周期函数 (Lifecycle Function) ---
+    // onMount 会在组件首次渲染到 DOM 后执行一次
+    onMount(() => {
+        reloadPresets();
     });
 
-    // --- 4. 事件处理函数 (Event Handlers) ---
+    // afterNavigate 会在每次导航到当前页面时执行
+    // 这确保了用户从自定义预设页面返回主页时，预设列表会更新
+    afterNavigate(() => {
+        reloadPresets();
+    });
+
+    // --- 5. 事件处理函数 (Event Handlers) ---
     /**
      * 处理“生成密码”按钮的点击事件或表单提交事件。
      */

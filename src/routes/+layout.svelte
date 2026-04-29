@@ -54,7 +54,15 @@
                 <ul>
                     <li><a href="/" class:menu-active={page.url.pathname === '/'}>首页</a></li>
                     <li><a href="/custom-presets" class:menu-active={page.url.pathname === '/custom-presets'}>自定义预设</a></li>
-                    <li><a href="/algorithm" class:menu-active={page.url.pathname === '/algorithm'}>算法介绍</a></li>
+                    <li>
+                        <details class={page.url.pathname.startsWith('/algorithm') ? 'open' : ''}>
+                            <summary>算法介绍</summary>
+                            <ul>
+                                <li><a href="/algorithm/v2" class:menu-active={page.url.pathname === '/algorithm/v2'}>V2 算法（推荐）</a></li>
+                                <li><a href="/algorithm/v1" class:menu-active={page.url.pathname === '/algorithm/v1'}>V1 算法（遗留）</a></li>
+                            </ul>
+                        </details>
+                    </li>
                 </ul>
             </div>
 
