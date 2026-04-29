@@ -1,5 +1,5 @@
-import { marked } from 'marked';
 import { error } from '@sveltejs/kit';
+import { renderTrustedMarkdown } from '$lib/markdown';
 
 // Vite's "?raw" import handles turning the file into a string at build time.
 // This is safe to use in a universal load function.
@@ -7,7 +7,7 @@ import markdownContent from '../../../ALGORITHM.md?raw';
 
 export function load() {
     try {
-        const htmlContent = marked.parse(markdownContent);
+        const htmlContent = renderTrustedMarkdown(markdownContent);
         // The load function returns the final HTML content as a prop
         return {
             content: htmlContent,

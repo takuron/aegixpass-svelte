@@ -11,6 +11,39 @@ import {
     type PresetIndexItem
 } from './types';
 
+const MAX_PASSWORD_LENGTH = 1024;
+const MAX_CHARSET_GROUPS = 128;
+const MAX_TOTAL_CHARSET_CHARS = 4096;
+
+function validatePresetShape(obj: any): void {
+    if (typeof obj.name !== 'string' || obj.name.length === 0) {
+        throw new AegixPassError('Invalid preset object: name must be a non-empty string.');
+    }
+    if (typeof obj.platformId !== 'string' || obj.platformId.length === 0) {
+        throw new AegixPassError('Invalid preset object: platformId must be a non-empty string.');
+    }
+    if (!Number.isSafeInteger(obj.length) || obj.length <= 0 || obj.length > MAX_PASSWORD_LENGTH) {
+        throw new AegixPassError(`Invalid preset object: length must be an integer from 1 to ${MAX_PASSWORD_LENGTH}.`);
+    }
+    if (!Array.isArray(obj.charsets) || obj.charsets.length === 0 || obj.charsets.length > MAX_CHARSET_GROUPS) {
+        throw new AegixPassError(`Invalid preset object: charsets must contain 1 to ${MAX_CHARSET_GROUPS} groups.`);
+    }
+    if (obj.charsets.some((charset: unknown) => typeof charset !== 'string' || Array.from(charset).length === 0)) {
+        throw new AegixPassError('Invalid preset object: every charset group must be a non-empty string.');
+    }
+
+    const totalCharsetChars = obj.charsets.reduce(
+        (total: number, charset: string) => total + Array.from(charset).length,
+        0
+    );
+    if (totalCharsetChars > MAX_TOTAL_CHARSET_CHARS) {
+        throw new AegixPassError(`Invalid preset object: total charset characters must not exceed ${MAX_TOTAL_CHARSET_CHARS}.`);
+    }
+    if (obj.length < obj.charsets.length) {
+        throw new AegixPassError('Invalid preset object: length must be greater than or equal to the number of charset groups.');
+    }
+}
+
 // --- 类型守卫函数 ---
 function isPresetV2(obj: any): obj is PresetV2 {
     return obj.version === 2;
@@ -49,9 +82,7 @@ function validateAndTransformObjectToPresetV1(obj: any): PresetV1 {
         throw new AegixPassError(`Invalid shuffleAlgorithm: "${obj.shuffleAlgorithm}"`);
     }
 
-    if (typeof obj.name !== 'string' || typeof obj.length !== 'number' || !Array.isArray(obj.charsets)) {
-        throw new AegixPassError('Invalid preset object: type mismatch for name, length, or charsets.');
-    }
+    validatePresetShape(obj);
 
     return obj as PresetV1;
 }
@@ -85,9 +116,7 @@ function validateAndTransformObjectToPresetV2(obj: any): PresetV2 {
         throw new AegixPassError(`Invalid rngAlgorithm: "${obj.rngAlgorithm}"`);
     }
 
-    if (typeof obj.name !== 'string' || typeof obj.length !== 'number' || !Array.isArray(obj.charsets)) {
-        throw new AegixPassError('Invalid preset object: type mismatch for name, length, or charsets.');
-    }
+    validatePresetShape(obj);
 
     return obj as PresetV2;
 }

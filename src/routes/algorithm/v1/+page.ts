@@ -1,11 +1,11 @@
-import { marked } from 'marked';
 import { error } from '@sveltejs/kit';
+import { renderTrustedMarkdown } from '$lib/markdown';
 
 import markdownContent from '../../../../ALGORITHM_v1.md?raw';
 
 export function load() {
     try {
-        const htmlContent = marked.parse(markdownContent);
+        const htmlContent = renderTrustedMarkdown(markdownContent);
         return {
             content: htmlContent,
         };

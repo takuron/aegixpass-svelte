@@ -162,9 +162,46 @@ describe('V2 Algorithm', () => {
         );
 
         for (const charset of (preset as PresetV2).charsets) {
-            const hasCharFromCharset = charset.split('').some(c => password.includes(c));
+            const hasCharFromCharset = Array.from(charset).some(c => password.includes(c));
             expect(hasCharFromCharset).toBe(true);
         }
+    });
+
+    it('should match the V2 default test vector', async () => {
+        const preset = allPresetsV2.find(p => p.name === 'AegixPass - Default');
+        expect(preset).toBeDefined();
+
+        const password = await aegixPassGenerator(masterPassword, distinguishKey, preset as PresetV2);
+
+        expect(password).toBe('7Y8BWW3i!l2JTcPP');
+    });
+
+    it('should treat Unicode charset characters as code points', async () => {
+        const unicodePreset: PresetV2 = {
+            name: 'Unicode-Vector',
+            version: 2,
+            fastHashAlgorithm: FastHashAlgorithm.Sha256,
+            slowHashAlgorithm: SlowHashAlgorithm.Argon2id,
+            rngAlgorithm: RngAlgorithm.ChaCha20,
+            length: 12,
+            platformId: 'aegixpass.takuron.com',
+            charsets: ['你好', '🚀🌙', 'AB']
+        };
+
+        const password = await aegixPassGenerator('密码🔑123', '测试网站.com 😊', unicodePreset);
+
+        expect(Array.from(password)).toHaveLength(unicodePreset.length);
+        expect(password).toBe('🚀好🚀B好好你B🚀🚀🚀🌙');
+    });
+
+    it('should generate passwords beyond the first ChaCha20 buffer', async () => {
+        const preset = allPresetsV2.find(p => p.name === 'AegixPass - Default') as PresetV2;
+        const longPreset: PresetV2 = {...preset, name: 'Long-Vector', length: 1100, charsets: ['a', 'B', '3', '!']};
+
+        const password = await aegixPassGenerator('long master', 'long site', longPreset);
+
+        expect(password).toHaveLength(longPreset.length);
+        expect(password.slice(0, 64)).toBe('B!!B3!B3aBaa!!a!!B3B!3aB!aaB!3a!a!3aBB33B!3!a3!!!BBBaBBaaaa3a!aB');
     });
 
     it('should handle different fast hash algorithms in V2', async () => {
@@ -263,7 +300,7 @@ describe('aegixPassGenerator with edge case inputs', () => {
                 expect(password).toBeDefined();
                 expect(typeof password).toBe('string');
                 if (preset.length) {
-                    expect(password.length).toBe(preset.length);
+                    expect(Array.from(password)).toHaveLength(preset.length);
                 }
             }
         });

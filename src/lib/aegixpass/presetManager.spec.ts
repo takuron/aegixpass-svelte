@@ -175,6 +175,58 @@ describe('V2 preset validation', () => {
                 charsets: ['abc']
             })
         },
+        {
+            case: 'non-integer length',
+            json: JSON.stringify({
+                name: 'Test',
+                version: 2,
+                fastHashAlgorithm: 'sha256',
+                slowHashAlgorithm: 'argon2id',
+                rngAlgorithm: 'chaCha20',
+                length: 16.5,
+                platformId: 'test.com',
+                charsets: ['abc']
+            })
+        },
+        {
+            case: 'empty platformId',
+            json: JSON.stringify({
+                name: 'Test',
+                version: 2,
+                fastHashAlgorithm: 'sha256',
+                slowHashAlgorithm: 'argon2id',
+                rngAlgorithm: 'chaCha20',
+                length: 16,
+                platformId: '',
+                charsets: ['abc']
+            })
+        },
+        {
+            case: 'non-string charset group',
+            json: JSON.stringify({
+                name: 'Test',
+                version: 2,
+                fastHashAlgorithm: 'sha256',
+                slowHashAlgorithm: 'argon2id',
+                rngAlgorithm: 'chaCha20',
+                length: 16,
+                platformId: 'test.com',
+                charsets: ['abc', 123]
+            })
+        },
+        {
+            case: 'length smaller than charset groups',
+            json: JSON.stringify({
+                name: 'Test',
+                version: 2,
+                fastHashAlgorithm: 'sha256',
+                slowHashAlgorithm: 'argon2id',
+                rngAlgorithm: 'chaCha20',
+                length: 1,
+                platformId: 'test.com',
+                charsets: ['abc', 'DEF']
+            })
+        },
     ];
 
     invalidV2Presets.forEach(({ case: caseName, json }) => {

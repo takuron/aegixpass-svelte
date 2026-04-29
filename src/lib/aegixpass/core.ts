@@ -54,6 +54,9 @@ function isPresetV1(preset: Preset): preset is PresetV1 {
  * @returns 一个在 [0, max) 范围内的、无偏差的随机整数。
  */
 function secureRandomRange_u32(next_u32: () => number, max: number): number {
+    if (!Number.isSafeInteger(max) || max <= 0 || max > 4294967295) {
+        throw new AegixPassError(`Random range max must be an integer in [1, 4294967295], got ${max}.`);
+    }
     // 别名，使代码更易读
     const range = max;
     // u32 的最大值 (2^32 - 1)，用于计算拒绝采样的阈值
@@ -158,6 +161,7 @@ async function aegixPassGeneratorV1(
     // --- (阶段 C) 保证每个字符集至少出现一次 (字符集保证) ---
     // V1 实现：使用 master_seed 的切片直接生成索引
     for (const [i, charsetGroup] of preset.charsets.entries()) {
+        const chars = Array.from(charsetGroup);
         // 将 32 字节的主种子按顺序分割成多个 4 字节的块。
         const startIndex = i * 4;
         // 取出第 i 个 4 字节块。
@@ -166,9 +170,9 @@ async function aegixPassGeneratorV1(
         // 将这个块解释为一个无符号 32 位整数（小端序）。
         const index_seed = dataView.getUint32(0, true); // `true` 表示 little-endian
         // 使用这个整数对当前字符集的长度进行取模运算，得到一个索引。
-        const char_index = index_seed % charsetGroup.length;
+        const char_index = index_seed % chars.length;
         // 将该索引对应的字符添加到初始密码数组中。
-        finalPasswordChars.push(charsetGroup[char_index]!);
+        finalPasswordChars.push(chars[char_index]!);
     }
 
     // --- 准备确定性随机数生成器 (RNG) ---
@@ -194,7 +198,7 @@ async function aegixPassGeneratorV1(
     const remainingLen = preset.length - finalPasswordChars.length;
     if (remainingLen > 0) {
         const combinedCharsetStr = preset.charsets.join('');
-        const combinedCharset = combinedCharsetStr.split('');
+        const combinedCharset = Array.from(combinedCharsetStr);
         const combinedLen = combinedCharset.length;
 
         for (let i = 0; i < remainingLen; i++) {
@@ -322,10 +326,21 @@ function createRngFromSeed(seed: Uint8Array, rngAlgorithm: RngAlgorithm): () => 
         case RngAlgorithm.ChaCha20: {
             // 使用一个 12 字节的全零数组作为 nonce
             const nonce = new Uint8Array(12).fill(0);
-            // 生成一个足够长的随机字节流 (4KB)
-            const randomByteStream = chacha20(seed, nonce, new Uint8Array(4096));
+            const blockSize = 4096;
+            let counter = 0;
+            let randomByteStream: Uint8Array<ArrayBufferLike> = new Uint8Array(0);
             let byteIndex = 0;
+
+            const refill = () => {
+                randomByteStream = chacha20(seed, nonce, new Uint8Array(blockSize), undefined, counter);
+                counter += blockSize / 64;
+                byteIndex = 0;
+            };
+
             return (): number => {
+                if (byteIndex + 4 > randomByteStream.length) {
+                    refill();
+                }
                 const view = new DataView(randomByteStream.buffer, byteIndex, 4);
                 byteIndex += 4;
                 return view.getUint32(0, true);
@@ -370,7 +385,7 @@ async function aegixPassGeneratorV2(
     // --- (阶段 C) 保证每个字符集至少出现一次 (V2: 使用 RNG 直接) ---
     let finalPasswordChars: string[] = [];
     for (const charsetGroup of preset.charsets) {
-        const chars = charsetGroup.split('');
+        const chars = Array.from(charsetGroup);
         const charIndex = secureRandomRange_u32(next_u32, chars.length);
         finalPasswordChars.push(chars[charIndex]!);
     }
@@ -379,7 +394,7 @@ async function aegixPassGeneratorV2(
     const remainingLen = preset.length - finalPasswordChars.length;
     if (remainingLen > 0) {
         const combinedCharsetStr = preset.charsets.join('');
-        const combinedCharset = combinedCharsetStr.split('');
+        const combinedCharset = Array.from(combinedCharsetStr);
         const combinedLen = combinedCharset.length;
 
         // 循环随机抽样
